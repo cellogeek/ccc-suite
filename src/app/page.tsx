@@ -3,14 +3,19 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { scriptureService } from "../services/scriptureService";
+import { firestoreService } from "../services/firestoreService";
 import { Slide, ComplianceReport } from "../types/scripture";
+import AuthButton from "../components/AuthButton";
+import { useSession } from "next-auth/react";
 
 export default function Home() {
+  const { data: session } = useSession();
   const [scriptureRef, setScriptureRef] = useState("Mark 2:1-12");
   const [slides, setSlides] = useState<Slide[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [complianceReport, setComplianceReport] = useState<ComplianceReport | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const generateSlides = async () => {
     setIsLoading(true);
@@ -19,17 +24,50 @@ export default function Home() {
       setSlides(result.slides);
       setComplianceReport(result.complianceReport);
       
-      // Save to localStorage
+      // Save to localStorage (for offline access)
       scriptureService.saveToStorage('lastGenerated', {
         reference: scriptureRef,
         slides: result.slides,
         timestamp: new Date().toISOString()
       });
+
+      // Auto-save to Firestore if user is logged in
+      if (session?.user?.id) {
+        await saveToFirestore(result.slides, result.complianceReport);
+      }
     } catch (error) {
       console.error("Error generating slides:", error);
       alert("Error generating slides. Please check the scripture reference format.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const saveToFirestore = async (slidesToSave: Slide[], compliance: ComplianceReport) => {
+    if (!session?.user?.id) {
+      alert('Please sign in to save presentations');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const presentationId = await firestoreService.savePresentation({
+        userId: session.user.id,
+        title: scriptureRef,
+        scriptureReference: scriptureRef,
+        slides: slidesToSave,
+        complianceReport: compliance,
+        isPublic: false,
+        tags: [scriptureRef.split(' ')[0]], // Add book name as tag
+      });
+      
+      console.log('Presentation saved with ID:', presentationId);
+      // Could show a success message here
+    } catch (error) {
+      console.error('Error saving to Firestore:', error);
+      alert('Error saving presentation. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -80,7 +118,7 @@ export default function Home() {
             </div>
           </div>
           <div className="hidden md:flex items-center space-x-4">
-            <span className="text-accent-500 text-sm">Media Team Tools</span>
+            <AuthButton />
           </div>
         </div>
       </header>
@@ -125,6 +163,23 @@ export default function Home() {
                     "Generate Slides"
                   )}
                 </button>
+                
+                {session?.user && slides.length > 0 && (
+                  <button
+                    onClick={() => saveToFirestore(slides, complianceReport!)}
+                    disabled={isSaving}
+                    className="glass-button w-full px-6 py-3 text-secondary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                  >
+                    {isSaving ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-secondary-600 border-t-transparent"></div>
+                        <span>Saving...</span>
+                      </div>
+                    ) : (
+                      "Save to Cloud"
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* CCC Rules Summary */}
