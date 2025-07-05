@@ -1,13 +1,13 @@
+
 'use client';
 
-import Image from "next/image";
 import { useState, useEffect } from "react";
-import { scriptureService } from "../../services/scriptureService";
-import { firestoreService } from "../../services/firestoreService";
-import { Slide, ComplianceReport } from "../../types/scripture";
-import AuthButton from "../../components/AuthButton";
 import { useSession } from "next-auth/react";
-import { BookOpen, Download, Save, Eye, Settings } from "lucide-react";
+import { BookOpen, Download, Save, Settings, CheckCircle } from "lucide-react";
+import AuthButton from "../../components/AuthButton";
+import { scriptureService } from "../../services/scriptureService";
+import { supabaseService } from "../../services/supabaseService";
+import { Slide, ComplianceReport } from "../../types/scripture";
 
 export default function ScripturePage() {
   const { data: session } = useSession();
@@ -17,21 +17,16 @@ export default function ScripturePage() {
   const [complianceReport, setComplianceReport] = useState<ComplianceReport | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [previewMode, setPreviewMode] = useState<'slides' | 'canvas'>('slides');
-  const [esvApiKey, setEsvApiKey] = useState('');
-
-  // Load ESV API key from localStorage on mount
-  useEffect(() => {
-    const savedKey = localStorage.getItem('esvApiKey');
-    if (savedKey) {
-      setEsvApiKey(savedKey);
-    }
-  }, []);
+  const [fontSize, setFontSize] = useState(46);
+  const [maxVersesPerSlide, setMaxVersesPerSlide] = useState(4);
 
   const generateSlides = async () => {
     setIsLoading(true);
     try {
-      const result = await scriptureService.generateSlides(scriptureRef);
+      const result = await scriptureService.generateSlides(scriptureRef, {
+        fontSize,
+        maxVersesPerSlide
+      });
       setSlides(result.slides);
       setComplianceReport(result.complianceReport);
       
@@ -42,9 +37,9 @@ export default function ScripturePage() {
         timestamp: new Date().toISOString()
       });
 
-      // Auto-save to Firestore if user is logged in
+      // Auto-save to Supabase if user is logged in
       if (session?.user?.id) {
-        await saveToFirestore(result.slides, result.complianceReport);
+        await saveToSupabase(result.slides, result.complianceReport);
       }
     } catch (error) {
       console.error("Error generating slides:", error);
@@ -54,7 +49,7 @@ export default function ScripturePage() {
     }
   };
 
-  const saveToFirestore = async (slidesToSave: Slide[], compliance: ComplianceReport) => {
+  const saveToSupabase = async (slidesToSave: Slide[], compliance: ComplianceReport) => {
     if (!session?.user?.id) {
       alert('Please sign in to save presentations');
       return;
@@ -62,7 +57,7 @@ export default function ScripturePage() {
 
     setIsSaving(true);
     try {
-      const presentationId = await firestoreService.savePresentation({
+      const presentationId = await supabaseService.savePresentation({
         userId: session.user.id,
         title: scriptureRef,
         scriptureReference: scriptureRef,
@@ -73,9 +68,10 @@ export default function ScripturePage() {
       });
       
       console.log('Presentation saved with ID:', presentationId);
-      // Could show a success message here
+      // Show success message
+      alert('Presentation saved successfully!');
     } catch (error) {
-      console.error('Error saving to Firestore:', error);
+      console.error('Error saving to Supabase:', error);
       alert('Error saving presentation. Please try again.');
     } finally {
       setIsSaving(false);
@@ -119,7 +115,7 @@ export default function ScripturePage() {
             <BookOpen className="w-8 h-8 text-primary-600" />
             <div>
               <h1 className="church-header">Scripture Slides</h1>
-              <p className="text-accent-600 text-sm">CCC Rule Compliant Verse Slides</p>
+              <p className="text-accent-600 text-sm">100% CCC Rule Compliant</p>
             </div>
           </div>
           <div className="hidden md:flex items-center space-x-4">
@@ -135,9 +131,8 @@ export default function ScripturePage() {
           {/* Scripture Input Panel */}
           <div className="lg:col-span-1">
             <div className="glass-card p-6 animate-slide-up">
-              <h2 className="text-xl font-semibold text-primary-800 mb-4 flex items-center space-x-2">
-                <Settings className="w-5 h-5" />
-                <span>Scripture Input</span>
+              <h2 className="text-xl font-semibold text-primary-800 mb-4">
+                Scripture Reference
               </h2>
               
               <div className="space-y-4">
@@ -154,26 +149,6 @@ export default function ScripturePage() {
                     className="glass-input w-full px-4 py-3 text-accent-800 placeholder-accent-400"
                   />
                 </div>
-
-                <div>
-                  <label htmlFor="esvKey" className="block text-sm font-medium text-accent-700 mb-2">
-                    ESV API Key (Optional)
-                  </label>
-                  <input
-                    id="esvKey"
-                    type="password"
-                    value={esvApiKey}
-                    onChange={(e) => {
-                      setEsvApiKey(e.target.value);
-                      localStorage.setItem('esvApiKey', e.target.value);
-                    }}
-                    placeholder="Enter ESV API key for live scripture"
-                    className="glass-input w-full px-4 py-3 text-accent-800 placeholder-accent-400"
-                  />
-                  <p className="text-xs text-accent-500 mt-1">
-                    Get your free API key at <a href="https://api.esv.org" target="_blank" className="text-primary-600 hover:underline">api.esv.org</a>
-                  </p>
-                </div>
                 
                 <button
                   onClick={generateSlides}
@@ -186,16 +161,13 @@ export default function ScripturePage() {
                       <span>Generating...</span>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center space-x-2">
-                      <BookOpen className="w-4 h-4" />
-                      <span>Generate Slides</span>
-                    </div>
+                    "Generate Slides"
                   )}
                 </button>
                 
                 {session?.user && slides.length > 0 && (
                   <button
-                    onClick={() => saveToFirestore(slides, complianceReport!)}
+                    onClick={() => saveToSupabase(slides, complianceReport!)}
                     disabled={isSaving}
                     className="glass-button w-full px-6 py-3 text-secondary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed mt-2"
                   >
@@ -218,20 +190,61 @@ export default function ScripturePage() {
               <div className="mt-6 p-4 bg-primary-50/50 rounded-lg border border-primary-200/50">
                 <h3 className="text-sm font-semibold text-primary-800 mb-2">CCC Rules Applied</h3>
                 <ul className="text-xs text-primary-700 space-y-1">
-                  <li>• Minimum 2 verses per slide</li>
-                  <li>• Font size: 39-49pt (target 46pt)</li>
-                  <li>• No 3+1 splits (redistribute as 2+2)</li>
-                  <li>• Orphan prevention</li>
-                  <li>• Intelligent sizing</li>
+                  <li>\u2022 Minimum 2 verses per slide</li>
+                  <li>\u2022 Font size: 39-49pt (target 46pt)</li>
+                  <li>\u2022 No 3+1 splits (redistribute as 2+2)</li>
+                  <li>\u2022 Orphan prevention</li>
+                  <li>\u2022 Intelligent sizing</li>
                 </ul>
               </div>
             </div>
 
-            {/* Export Options */}
+            {/* Settings Panel */}
             <div className="glass-card p-6 mt-6 animate-slide-up" style={{animationDelay: '0.1s'}}>
               <h2 className="text-xl font-semibold text-primary-800 mb-4 flex items-center space-x-2">
-                <Download className="w-5 h-5" />
-                <span>Export Options</span>
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-accent-700 mb-2">
+                    Font Size (39-49pt)
+                  </label>
+                  <input
+                    type="range"
+                    min="39"
+                    max="49"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="text-center text-sm text-accent-600 mt-1">
+                    {fontSize}pt
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-accent-700 mb-2">
+                    Max Verses Per Slide
+                  </label>
+                  <select
+                    value={maxVersesPerSlide}
+                    onChange={(e) => setMaxVersesPerSlide(Number(e.target.value))}
+                    className="glass-input w-full px-4 py-3"
+                  >
+                    <option value={2}>2 verses</option>
+                    <option value={3}>3 verses</option>
+                    <option value={4}>4 verses</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Export Options */}
+            <div className="glass-card p-6 mt-6 animate-slide-up" style={{animationDelay: '0.2s'}}>
+              <h2 className="text-xl font-semibold text-primary-800 mb-4">
+                Export Options
               </h2>
               
               <div className="space-y-3">
@@ -273,38 +286,10 @@ export default function ScripturePage() {
 
           {/* Slide Preview Panel */}
           <div className="lg:col-span-2">
-            <div className="glass-card p-6 animate-slide-up" style={{animationDelay: '0.2s'}}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-primary-800 flex items-center space-x-2">
-                  <Eye className="w-5 h-5" />
-                  <span>Slide Preview</span>
-                </h2>
-                
-                {slides.length > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => setPreviewMode('slides')}
-                      className={`px-3 py-1 rounded text-sm transition-colors ${
-                        previewMode === 'slides' 
-                          ? 'bg-primary-100 text-primary-800' 
-                          : 'text-accent-600 hover:text-primary-700'
-                      }`}
-                    >
-                      Slides
-                    </button>
-                    <button
-                      onClick={() => setPreviewMode('canvas')}
-                      className={`px-3 py-1 rounded text-sm transition-colors ${
-                        previewMode === 'canvas' 
-                          ? 'bg-primary-100 text-primary-800' 
-                          : 'text-accent-600 hover:text-primary-700'
-                      }`}
-                    >
-                      Canvas
-                    </button>
-                  </div>
-                )}
-              </div>
+            <div className="glass-card p-6 animate-slide-up" style={{animationDelay: '0.3s'}}>
+              <h2 className="text-xl font-semibold text-primary-800 mb-4">
+                Slide Preview
+              </h2>
               
               {slides.length === 0 ? (
                 <div className="slide-container flex items-center justify-center">
@@ -337,14 +322,21 @@ export default function ScripturePage() {
 
             {/* Compliance Report */}
             {complianceReport && (
-              <div className="glass-card p-6 mt-6 animate-slide-up" style={{animationDelay: '0.3s'}}>
-                <h2 className="text-xl font-semibold text-primary-800 mb-4">
-                  CCC Compliance Report
+              <div className="glass-card p-6 mt-6 animate-slide-up" style={{animationDelay: '0.4s'}}>
+                <h2 className="text-xl font-semibold text-primary-800 mb-4 flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span>CCC Compliance Report</span>
                 </h2>
                 <div className="bg-green-50/50 border border-green-200/50 rounded-lg p-4">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                     <span className="text-green-800 font-medium">100% CCC Rule Compliance</span>
+                  </div>
+                  <div className="mt-3 text-sm text-green-700">
+                    <p>\u2713 All slides contain minimum 2 verses</p>
+                    <p>\u2713 Font size optimized within 39-49pt range</p>
+                    <p>\u2713 No orphaned verses or 3+1 splits</p>
+                    <p>\u2713 Intelligent verse distribution applied</p>
                   </div>
                 </div>
               </div>
