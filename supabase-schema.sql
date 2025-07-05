@@ -1,9 +1,6 @@
 -- CCC Suite Database Schema for Supabase
 -- Run this in your Supabase SQL editor
 
--- Enable Row Level Security
-ALTER DATABASE postgres SET "app.jwt_secret" TO 'your-jwt-secret';
-
 -- Create presentations table
 CREATE TABLE IF NOT EXISTS presentations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
