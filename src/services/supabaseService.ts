@@ -1,78 +1,97 @@
-import { supabase } from '../lib/supabase'
-import { Slide, ComplianceReport } from '../types/scripture'
+import { supabase } from '../lib/supabase';
+import { Slide, ComplianceReport } from '../types/scripture';
 
 export interface PresentationData {
-  id?: string
-  user_id: string
-  title: string
-  scripture_reference: string
-  slides: Slide[]
-  compliance_report: ComplianceReport
-  streaming_title?: string
-  streaming_description?: string
-  is_public: boolean
-  tags: string[]
-  created_at?: string
-  updated_at?: string
+  id?: string;
+  userId: string;
+  title: string;
+  scriptureReference: string;
+  slides: Slide[];
+  complianceReport: ComplianceReport;
+  createdAt: Date;
+  updatedAt: Date;
+  isPublic: boolean;
+  tags: string[];
 }
 
 export class SupabaseService {
-  private static instance: SupabaseService
-  
+  private static instance: SupabaseService;
+
   public static getInstance(): SupabaseService {
     if (!SupabaseService.instance) {
-      SupabaseService.instance = new SupabaseService()
+      SupabaseService.instance = new SupabaseService();
     }
-    return SupabaseService.instance
+    return SupabaseService.instance;
   }
 
-  // Save presentation
-  async savePresentation(presentation: Omit<PresentationData, 'id' | 'created_at' | 'updated_at'>): Promise<string> {
+  // Save presentation to Supabase
+  async savePresentation(presentation: Omit<PresentationData, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
+      const presentationData = {
+        ...presentation,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       const { data, error } = await supabase
         .from('presentations')
-        .insert([presentation])
+        .insert([presentationData])
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
-      return data.id
+      if (error) throw error;
+      return data.id;
     } catch (error) {
-      console.error('Error saving presentation:', error)
-      throw error
+      console.error('Error saving presentation:', error);
+      throw error;
     }
   }
 
-  // Update presentation
+  // Update existing presentation
   async updatePresentation(id: string, updates: Partial<PresentationData>): Promise<void> {
     try {
       const { error } = await supabase
         .from('presentations')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', id)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
 
-      if (error) throw error
+      if (error) throw error;
     } catch (error) {
-      console.error('Error updating presentation:', error)
-      throw error
+      console.error('Error updating presentation:', error);
+      throw error;
     }
   }
 
   // Get user's presentations
-  async getUserPresentations(userId: string, limit: number = 50): Promise<PresentationData[]> {
+  async getUserPresentations(userId: string, limitCount: number = 50): Promise<PresentationData[]> {
     try {
       const { data, error } = await supabase
         .from('presentations')
         .select('*')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false })
-        .limit(limit)
+        .limit(limitCount);
 
-      if (error) throw error
-      return data || []
+      if (error) throw error;
+
+      return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        title: item.title,
+        scriptureReference: item.scripture_reference,
+        slides: item.slides,
+        complianceReport: item.compliance_report,
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.updated_at),
+        isPublic: item.is_public,
+        tags: item.tags || [],
+      }));
     } catch (error) {
-      console.error('Error getting user presentations:', error)
-      throw error
+      console.error('Error getting user presentations:', error);
+      throw error;
     }
   }
 
@@ -83,13 +102,28 @@ export class SupabaseService {
         .from('presentations')
         .select('*')
         .eq('id', id)
-        .single()
+        .single();
 
-      if (error) throw error
-      return data
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        userId: data.user_id,
+        title: data.title,
+        scriptureReference: data.scripture_reference,
+        slides: data.slides,
+        complianceReport: data.compliance_report,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+        isPublic: data.is_public,
+        tags: data.tags || [],
+      };
     } catch (error) {
-      console.error('Error getting presentation:', error)
-      return null
+      console.error('Error getting presentation:', error);
+      throw error;
     }
   }
 
@@ -99,34 +133,46 @@ export class SupabaseService {
       const { error } = await supabase
         .from('presentations')
         .delete()
-        .eq('id', id)
+        .eq('id', id);
 
-      if (error) throw error
+      if (error) throw error;
     } catch (error) {
-      console.error('Error deleting presentation:', error)
-      throw error
+      console.error('Error deleting presentation:', error);
+      throw error;
     }
   }
 
-  // Get public presentations
-  async getPublicPresentations(limit: number = 20): Promise<PresentationData[]> {
+  // Get public presentations (for sharing)
+  async getPublicPresentations(limitCount: number = 20): Promise<PresentationData[]> {
     try {
       const { data, error } = await supabase
         .from('presentations')
         .select('*')
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
-        .limit(limit)
+        .limit(limitCount);
 
-      if (error) throw error
-      return data || []
+      if (error) throw error;
+
+      return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        title: item.title,
+        scriptureReference: item.scripture_reference,
+        slides: item.slides,
+        complianceReport: item.compliance_report,
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.updated_at),
+        isPublic: item.is_public,
+        tags: item.tags || [],
+      }));
     } catch (error) {
-      console.error('Error getting public presentations:', error)
-      throw error
+      console.error('Error getting public presentations:', error);
+      throw error;
     }
   }
 
-  // Search presentations
+  // Search presentations by scripture reference
   async searchPresentations(userId: string, searchTerm: string): Promise<PresentationData[]> {
     try {
       const { data, error } = await supabase
@@ -134,94 +180,27 @@ export class SupabaseService {
         .select('*')
         .eq('user_id', userId)
         .or(`scripture_reference.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%`)
-        .order('updated_at', { ascending: false })
+        .order('updated_at', { ascending: false });
 
-      if (error) throw error
-      return data || []
+      if (error) throw error;
+
+      return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        title: item.title,
+        scriptureReference: item.scripture_reference,
+        slides: item.slides,
+        complianceReport: item.compliance_report,
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.updated_at),
+        isPublic: item.is_public,
+        tags: item.tags || [],
+      }));
     } catch (error) {
-      console.error('Error searching presentations:', error)
-      throw error
+      console.error('Error searching presentations:', error);
+      throw error;
     }
-  }
-
-  // ESV API Key management
-  async getESVApiKey(): Promise<string | null> {
-    try {
-      const { data, error } = await supabase
-        .from('app_settings')
-        .select('esv_api_key')
-        .eq('id', 'global')
-        .single()
-
-      if (error) return null
-      return data?.esv_api_key || null
-    } catch (error) {
-      console.error('Error getting ESV API key:', error)
-      return null
-    }
-  }
-
-  async updateESVApiKey(apiKey: string, userId: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('app_settings')
-        .upsert({
-          id: 'global',
-          esv_api_key: apiKey,
-          updated_by: userId,
-          updated_at: new Date().toISOString()
-        })
-
-      if (error) throw error
-    } catch (error) {
-      console.error('Error updating ESV API key:', error)
-      throw error
-    }
-  }
-
-  // Get current user
-  async getCurrentUser() {
-    const { data: { user } } = await supabase.auth.getUser()
-    return user
-  }
-
-  // Sign in with Google
-  async signInWithGoogle() {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`
-      }
-    })
-    if (error) throw error
-    return data
-  }
-
-  // Sign in with email
-  async signInWithEmail(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-    if (error) throw error
-    return data
-  }
-
-  // Sign up with email
-  async signUpWithEmail(email: string, password: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password
-    })
-    if (error) throw error
-    return data
-  }
-
-  // Sign out
-  async signOut() {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
   }
 }
 
-export const supabaseService = SupabaseService.getInstance()
+export const supabaseService = SupabaseService.getInstance();
