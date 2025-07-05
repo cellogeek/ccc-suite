@@ -1,19 +1,34 @@
-import { ScriptureReference, ScriptureServiceResult, ExportOptions } from '../types/scripture';
+import { supabaseService } from './supabaseService';
 
-// This will be dynamically imported to avoid SSR issues
-let CCCScriptureService: any = null;
+export interface Slide {
+  id: string;
+  title: string;
+  content: string;
+  fontSize: number;
+  verseCount: number;
+}
 
-const initializeService = async () => {
-  if (typeof window !== 'undefined' && !CCCScriptureService) {
-    // Dynamically import the service
-    const serviceModule = await import('../lib/ccc-scripture-service-final.js');
-    CCCScriptureService = serviceModule.default || serviceModule;
-  }
-};
+export interface ComplianceReport {
+  isCompliant: boolean;
+  rules: {
+    minimumVersesPerSlide: boolean;
+    fontSizeRange: boolean;
+    noThreePlusOneSplits: boolean;
+    orphanPrevention: boolean;
+  };
+  totalSlides: number;
+  totalVerses: number;
+}
 
-export class ScriptureService {
+export interface ScriptureServiceOptions {
+  fontSize?: number;
+  maxVersesPerSlide?: number;
+  userId?: string; // Add userId to fetch ESV API key
+}
+
+class ScriptureService {
   private static instance: ScriptureService;
-  
+
   public static getInstance(): ScriptureService {
     if (!ScriptureService.instance) {
       ScriptureService.instance = new ScriptureService();
@@ -21,226 +36,309 @@ export class ScriptureService {
     return ScriptureService.instance;
   }
 
-  async generateSlides(reference: string): Promise<ScriptureServiceResult> {
-    await initializeService();
-    
-    if (!CCCScriptureService) {
-      throw new Error('Scripture service not initialized');
+  // Fetch real scripture text from ESV API
+  async fetchEsvText(reference: string, apiKey: string): Promise<string | null> {
+    try {
+      const encodedRef = encodeURIComponent(reference);
+      const response = await fetch(
+        `https://api.esv.org/v3/passage/text/?q=${encodedRef}&include-headings=false&include-footnotes=false&include-verse-numbers=true&include-short-copyright=false&include-passage-references=false`,
+        {
+          headers: {
+            'Authorization': `Token ${apiKey}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        console.error('ESV API error:', response.status, response.statusText);
+        return null;
+      }
+
+      const data = await response.json();
+      
+      if (data.passages && data.passages.length > 0) {
+        // Clean up the text - remove extra whitespace and normalize
+        return data.passages[0].trim();
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error fetching ESV text:', error);
+      return null;
     }
+  }
+
+  // Parse scripture reference to extract book, chapter, and verses
+  parseScriptureReference(reference: string): { book: string; chapter: number; startVerse: number; endVerse: number } | null {
+    try {
+      // Handle formats like "Mark 2:1-12", "John 3:16", "1 Corinthians 13:1-13"
+      const match = reference.match(/^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$/);
+      
+      if (!match) return null;
+      
+      const book = match[1].trim();
+      const chapter = parseInt(match[2]);
+      const startVerse = parseInt(match[3]);
+      const endVerse = match[4] ? parseInt(match[4]) : startVerse;
+      
+      return { book, chapter, startVerse, endVerse };
+    } catch (error) {
+      console.error('Error parsing scripture reference:', error);
+      return null;
+    }
+  }
+
+  // Split ESV text into individual verses
+  splitIntoVerses(text: string, startVerse: number): string[] {
+    try {
+      // ESV API returns text with verse numbers like "[1] In the beginning..."
+      const verses: string[] = [];
+      
+      // Split by verse numbers in brackets
+      const parts = text.split(/\[(\d+)\]/);
+      
+      for (let i = 1; i < parts.length; i += 2) {
+        const verseNumber = parseInt(parts[i]);
+        const verseText = parts[i + 1]?.trim();
+        
+        if (verseText) {
+          verses.push(`${verseNumber} ${verseText}`);
+        }
+      }
+      
+      return verses.length > 0 ? verses : [text]; // Fallback to full text if parsing fails
+    } catch (error) {
+      console.error('Error splitting verses:', error);
+      return [text];
+    }
+  }
+
+  // Generate placeholder text (fallback when no ESV API key)
+  generatePlaceholderText(reference: string): string[] {
+    const parsed = this.parseScriptureReference(reference);
+    if (!parsed) return [`Placeholder text for ${reference}`];
+    
+    const verses: string[] = [];
+    for (let v = parsed.startVerse; v <= parsed.endVerse; v++) {
+      verses.push(`${v} This is placeholder text for ${parsed.book} ${parsed.chapter}:${v}. The actual scripture text will appear when you add your ESV API key in Settings.`);
+    }
+    
+    return verses;
+  }
+
+  // Main method to generate slides
+  async generateSlides(reference: string, options: ScriptureServiceOptions = {}): Promise<{ slides: Slide[]; complianceReport: ComplianceReport }> {
+    const {
+      fontSize = 46,
+      maxVersesPerSlide = 4,
+      userId
+    } = options;
 
     try {
-      // Parse the reference
-      const parsedRef = this.parseReference(reference);
+      let verses: string[] = [];
       
-      // Mock ESV API data for now - in production this would call the actual API
-      const mockVerseData = await this.getMockVerseData(parsedRef);
-      
-      // Create CCC service instance
-      const cccService = new CCCScriptureService();
-      
-      // Generate slides using CCC service
-      const result = await cccService.generatePresentation(mockVerseData.verses, {
-        reference: reference,
-        title: `${parsedRef.book} ${parsedRef.chapter}:${parsedRef.startVerse}-${parsedRef.endVerse}`
-      });
-
-      return {
-        slides: result.slides.map((slide: any, index: number) => ({
-          id: index + 1,
-          title: slide.title || `${reference} (${index + 1})`,
-          content: slide.content,
-          verses: slide.verses || [],
-          fontSize: slide.fontSize || 46,
-          verseCount: slide.verseCount || slide.verses?.length || 0
-        })),
-        complianceReport: {
-          isCompliant: result.complianceReport?.isCompliant || true,
-          rules: {
-            minimumVersesPerSlide: result.complianceReport?.rules?.minimumVersesPerSlide || true,
-            noThreePlusOneSplits: result.complianceReport?.rules?.noThreePlusOneSplits || true,
-            fontSizeInRange: result.complianceReport?.rules?.fontSizeInRange || true,
-            orphanPrevention: result.complianceReport?.rules?.orphanPrevention || true,
-            intelligentSizing: result.complianceReport?.rules?.intelligentSizing || true,
-          },
-          details: {
-            totalSlides: result.slides.length,
-            averageFontSize: result.complianceReport?.averageFontSize || 46,
-            verseDistribution: result.complianceReport?.verseDistribution || []
+      // Try to get real ESV text if user has API key
+      if (userId) {
+        const esvApiKey = await supabaseService.getEsvApiKey(userId);
+        if (esvApiKey) {
+          const esvText = await this.fetchEsvText(reference, esvApiKey);
+          if (esvText) {
+            const parsed = this.parseScriptureReference(reference);
+            if (parsed) {
+              verses = this.splitIntoVerses(esvText, parsed.startVerse);
+            }
           }
-        },
-        reference: parsedRef
-      };
+        }
+      }
+      
+      // Fallback to placeholder text if no ESV text available
+      if (verses.length === 0) {
+        verses = this.generatePlaceholderText(reference);
+      }
+
+      // Apply CCC rules to create slides
+      const slides = this.createCCCCompliantSlides(verses, reference, fontSize, maxVersesPerSlide);
+      
+      // Generate compliance report
+      const complianceReport = this.generateComplianceReport(slides, verses.length);
+      
+      return { slides, complianceReport };
+      
     } catch (error) {
       console.error('Error generating slides:', error);
-      throw error;
+      throw new Error('Failed to generate slides. Please check your scripture reference.');
     }
   }
 
-  async exportSlides(slides: any[], options: ExportOptions, reference: string): Promise<Blob> {
-    try {
-      let content: string;
-      let mimeType: string;
-      
-      switch (options.format) {
-        case 'rtf':
-          content = this.generateRTF(slides, reference);
-          mimeType = 'application/rtf';
-          break;
-        case 'txt':
-          content = this.generateTXT(slides, reference);
-          mimeType = 'text/plain';
-          break;
-        case 'pro':
-          // PRO format would require the full CCC service
-          throw new Error('PRO export requires full CCC Scripture Service integration');
-        default:
-          content = this.generateTXT(slides, reference);
-          mimeType = 'text/plain';
-      }
-
-      return new Blob([content], { type: mimeType });
-    } catch (error) {
-      console.error('Error exporting slides:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Generate user-friendly RTF format (from penguin service)
-   * Optimized for Apple Pages compatibility
-   */
-  private generateRTF(slides: any[], reference: string): string {
-    let rtf = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}';
-    rtf += '\\f0\\fs24 '; // 12pt font
-
-    slides.forEach((slide, index) => {
-      if (index > 0) rtf += '\\page '; // New page for each slide except first
-      
-      // Title slide or verse slide
-      rtf += `\\qc\\fs32\\b ${this.escapeRTF(slide.title)}\\par\\par`;
-      
-      if (slide.content) {
-        rtf += `\\fs24\\b0 ${this.escapeRTF(slide.content)}\\par`;
-      }
-      
-      rtf += '\\par\\par';
-    });
-
-    rtf += '}';
-    return rtf;
-  }
-
-  /**
-   * Generate plain text format (from penguin service)
-   */
-  private generateTXT(slides: any[], reference: string): string {
-    let txt = `${reference}\n`;
-    txt += '='.repeat(reference.length) + '\n\n';
-
-    slides.forEach((slide, index) => {
-      txt += `Slide ${index + 1}: `;
-      txt += `${slide.title}\n`;
-      
-      if (slide.content) {
-        txt += `${slide.content}\n`;
-      }
-      
-      txt += '\n' + '-'.repeat(50) + '\n\n';
-    });
-
-    return txt;
-  }
-
-  /**
-   * Escape special characters for RTF (from penguin service)
-   */
-  private escapeRTF(text: string): string {
-    return text
-      .replace(/\\/g, '\\\\')
-      .replace(/\{/g, '\\{')
-      .replace(/\}/g, '\\}')
-      .replace(/\n/g, '\\par ')
-      .replace(/\r/g, '');
-  }
-
-  private parseReference(reference: string): ScriptureReference {
-    // Simple reference parser - can be enhanced
-    const match = reference.match(/^(\w+)\s+(\d+):(\d+)(?:-(\d+))?$/);
+  // Create CCC compliant slides from verses
+  private createCCCCompliantSlides(verses: string[], reference: string, fontSize: number, maxVersesPerSlide: number): Slide[] {
+    const slides: Slide[] = [];
+    let currentSlideVerses: string[] = [];
     
-    if (!match) {
-      throw new Error('Invalid scripture reference format');
+    for (let i = 0; i < verses.length; i++) {
+      currentSlideVerses.push(verses[i]);
+      
+      // Check if we should create a slide
+      const shouldCreateSlide = 
+        currentSlideVerses.length >= maxVersesPerSlide || // Max verses reached
+        i === verses.length - 1 || // Last verse
+        (currentSlideVerses.length >= 2 && this.wouldCreateOrphan(i, verses.length)); // Prevent orphans
+      
+      if (shouldCreateSlide) {
+        // Ensure minimum 2 verses per slide (except for single verse passages)
+        if (currentSlideVerses.length >= 2 || verses.length === 1) {
+          slides.push(this.createSlide(currentSlideVerses, reference, fontSize, slides.length + 1));
+          currentSlideVerses = [];
+        }
+      }
     }
+    
+    // Handle any remaining verses
+    if (currentSlideVerses.length > 0) {
+      if (currentSlideVerses.length === 1 && slides.length > 0) {
+        // Redistribute to avoid orphan - add to previous slide
+        const lastSlide = slides[slides.length - 1];
+        lastSlide.content += '\n\n' + currentSlideVerses[0];
+        lastSlide.verseCount += 1;
+      } else {
+        slides.push(this.createSlide(currentSlideVerses, reference, fontSize, slides.length + 1));
+      }
+    }
+    
+    return slides;
+  }
 
-    const [, book, chapter, startVerse, endVerse] = match;
+  // Check if creating a slide now would leave an orphan
+  private wouldCreateOrphan(currentIndex: number, totalVerses: number): boolean {
+    const remainingVerses = totalVerses - currentIndex - 1;
+    return remainingVerses === 1; // Would leave exactly 1 verse
+  }
+
+  // Create individual slide
+  private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
+    const content = verses.join('\n\n');
+    const title = `${reference} (${slideNumber})`;
     
     return {
-      book,
-      chapter: parseInt(chapter),
-      startVerse: parseInt(startVerse),
-      endVerse: endVerse ? parseInt(endVerse) : parseInt(startVerse),
-      reference
+      id: `slide-${slideNumber}`,
+      title,
+      content,
+      fontSize,
+      verseCount: verses.length
     };
   }
 
-  private async getMockVerseData(ref: ScriptureReference): Promise<any> {
-    // Mock data for Mark 2:1-12 - in production this would call ESV API
-    if (ref.book === 'Mark' && ref.chapter === 2) {
-      return {
-        reference: ref.reference,
-        verses: [
-          { number: 1, text: "And when he returned to Capernaum after some days, it was reported that he was at home." },
-          { number: 2, text: "And many were gathered together, so that there was no more room, not even at the door. And he was preaching the word to them." },
-          { number: 3, text: "And they came, bringing to him a paralytic carried by four men." },
-          { number: 4, text: "And when they could not get near him because of the crowd, they removed the roof above him, and when they had made an opening, they let down the bed on which the paralytic lay." },
-          { number: 5, text: "And when Jesus saw their faith, he said to the paralytic, \"Son, your sins are forgiven.\"" },
-          { number: 6, text: "Now some of the scribes were sitting there, questioning in their hearts," },
-          { number: 7, text: "\"Why does this man speak like that? He is blaspheming! Who can forgive sins but God alone?\"" },
-          { number: 8, text: "And immediately Jesus, perceiving in his spirit that they thus questioned within themselves, said to them, \"Why do you question these things in your hearts?" },
-          { number: 9, text: "Which is easier, to say to the paralytic, 'Your sins are forgiven,' or to say, 'Rise, take up your bed and walk'?" },
-          { number: 10, text: "But that you may know that the Son of Man has authority on earth to forgive sins\"—he said to the paralytic—" },
-          { number: 11, text: "\"I say to you, rise, pick up your bed, and go home.\"" },
-          { number: 12, text: "And he rose and immediately picked up his bed and went out before them all, so that they were all amazed and glorified God, saying, \"We never saw anything like this!\"" }
-        ].filter(v => v.number >= ref.startVerse && v.number <= ref.endVerse)
-      };
-    }
-
-    // Default mock data for other references
+  // Generate compliance report
+  private generateComplianceReport(slides: Slide[], totalVerses: number): ComplianceReport {
+    const rules = {
+      minimumVersesPerSlide: slides.every(slide => slide.verseCount >= 2 || slides.length === 1),
+      fontSizeRange: slides.every(slide => slide.fontSize >= 39 && slide.fontSize <= 49),
+      noThreePlusOneSplits: !this.hasThreePlusOneSplits(slides),
+      orphanPrevention: !this.hasOrphans(slides)
+    };
+    
+    const isCompliant = Object.values(rules).every(rule => rule);
+    
     return {
-      reference: ref.reference,
-      verses: [
-        { number: ref.startVerse, text: `Sample verse ${ref.startVerse} from ${ref.book} ${ref.chapter}` },
-        { number: ref.startVerse + 1, text: `Sample verse ${ref.startVerse + 1} from ${ref.book} ${ref.chapter}` }
-      ]
+      isCompliant,
+      rules,
+      totalSlides: slides.length,
+      totalVerses
     };
   }
 
-  // localStorage persistence methods
+  // Check for 3+1 splits
+  private hasThreePlusOneSplits(slides: Slide[]): boolean {
+    for (let i = 0; i < slides.length - 1; i++) {
+      if (slides[i].verseCount === 3 && slides[i + 1].verseCount === 1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Check for orphan verses
+  private hasOrphans(slides: Slide[]): boolean {
+    return slides.some(slide => slide.verseCount === 1) && slides.length > 1;
+  }
+
+  // Export slides to various formats
+  async exportSlides(slides: Slide[], options: { format: 'rtf' | 'txt' | 'pro' }, reference: string): Promise<Blob> {
+    const { format } = options;
+    
+    switch (format) {
+      case 'rtf':
+        return this.exportToRTF(slides, reference);
+      case 'txt':
+        return this.exportToTXT(slides, reference);
+      case 'pro':
+        return this.exportToPRO(slides, reference);
+      default:
+        throw new Error(`Unsupported export format: ${format}`);
+    }
+  }
+
+  // Export to RTF format
+  private exportToRTF(slides: Slide[], reference: string): Blob {
+    let rtfContent = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}';
+    rtfContent += `\\f0\\fs48 ${reference}\\par\\par`;
+    
+    slides.forEach((slide, index) => {
+      rtfContent += `\\page\\f0\\fs${slide.fontSize * 2} ${slide.content.replace(/\n/g, '\\par ')}\\par`;
+    });
+    
+    rtfContent += '}';
+    
+    return new Blob([rtfContent], { type: 'application/rtf' });
+  }
+
+  // Export to TXT format
+  private exportToTXT(slides: Slide[], reference: string): Blob {
+    let txtContent = `${reference}\n\n`;
+    
+    slides.forEach((slide, index) => {
+      txtContent += `--- Slide ${index + 1} ---\n`;
+      txtContent += `${slide.content}\n\n`;
+    });
+    
+    return new Blob([txtContent], { type: 'text/plain' });
+  }
+
+  // Export to ProPresenter format
+  private exportToPRO(slides: Slide[], reference: string): Blob {
+    const proData = {
+      presentation: {
+        title: reference,
+        slides: slides.map((slide, index) => ({
+          id: slide.id,
+          title: slide.title,
+          content: slide.content,
+          fontSize: slide.fontSize
+        }))
+      }
+    };
+    
+    return new Blob([JSON.stringify(proData, null, 2)], { type: 'application/json' });
+  }
+
+  // Save to localStorage
   saveToStorage(key: string, data: any): void {
-    if (typeof window !== 'undefined') {
+    try {
       localStorage.setItem(`ccc-suite-${key}`, JSON.stringify(data));
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
     }
   }
 
+  // Load from localStorage
   loadFromStorage(key: string): any {
-    if (typeof window !== 'undefined') {
+    try {
       const data = localStorage.getItem(`ccc-suite-${key}`);
       return data ? JSON.parse(data) : null;
-    }
-    return null;
-  }
-
-  clearStorage(key?: string): void {
-    if (typeof window !== 'undefined') {
-      if (key) {
-        localStorage.removeItem(`ccc-suite-${key}`);
-      } else {
-        // Clear all CCC Suite data
-        Object.keys(localStorage).forEach(k => {
-          if (k.startsWith('ccc-suite-')) {
-            localStorage.removeItem(k);
-          }
-        });
-      }
+    } catch (error) {
+      console.error('Error loading from localStorage:', error);
+      return null;
     }
   }
 }
