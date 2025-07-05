@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { BookOpen, Download, Save, Settings, CheckCircle } from "lucide-react";
+import { BookOpen, Download, Save, Settings, CheckCircle, Key } from "lucide-react";
 import AuthButton from "../../components/AuthButton";
 import { scriptureService } from "../../services/scriptureService";
 import { supabaseService } from "../../services/supabaseService";
@@ -19,13 +19,36 @@ export default function ScripturePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [fontSize, setFontSize] = useState(46);
   const [maxVersesPerSlide, setMaxVersesPerSlide] = useState(4);
+  const [hasEsvKey, setHasEsvKey] = useState(false);
+  const [isCheckingEsvKey, setIsCheckingEsvKey] = useState(false);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      checkEsvApiKey();
+    }
+  }, [session]);
+
+  const checkEsvApiKey = async () => {
+    if (!session?.user?.id) return;
+    
+    setIsCheckingEsvKey(true);
+    try {
+      const esvKey = await supabaseService.getEsvApiKey(session.user.id);
+      setHasEsvKey(!!esvKey);
+    } catch (error) {
+      console.error('Error checking ESV API key:', error);
+    } finally {
+      setIsCheckingEsvKey(false);
+    }
+  };
 
   const generateSlides = async () => {
     setIsLoading(true);
     try {
       const result = await scriptureService.generateSlides(scriptureRef, {
         fontSize,
-        maxVersesPerSlide
+        maxVersesPerSlide,
+        userId: session?.user?.id // Pass userId to enable ESV API
       });
       setSlides(result.slides);
       setComplianceReport(result.complianceReport);
@@ -186,6 +209,33 @@ export default function ScripturePage() {
                 )}
               </div>
 
+              {/* ESV API Status */}
+              {session?.user && (
+                <div className="mt-6 p-4 bg-blue-50/50 rounded-lg border border-blue-200/50">
+                  <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center space-x-2">
+                    <Key className="w-4 h-4" />
+                    <span>ESV API Status</span>
+                  </h3>
+                  {isCheckingEsvKey ? (
+                    <p className="text-sm text-blue-700">Checking ESV API key...</p>
+                  ) : hasEsvKey ? (
+                    <div className="space-y-2">
+                      <p className="text-sm text-green-700">\u2705 ESV API key configured - using real scripture text</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm text-blue-700">\u26a0\ufe0f No ESV API key - using placeholder text</p>
+                      <a
+                        href="/settings"
+                        className="inline-block text-sm text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        Add ESV API key in Settings \u2192
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* CCC Rules Summary */}
               <div className="mt-6 p-4 bg-primary-50/50 rounded-lg border border-primary-200/50">
                 <h3 className="text-sm font-semibold text-primary-800 mb-2">CCC Rules Applied</h3>
@@ -299,6 +349,11 @@ export default function ScripturePage() {
                     </div>
                     <p className="text-lg">Enter a scripture reference to generate slides</p>
                     <p className="text-sm mt-2 opacity-75">CCC rules will be automatically applied</p>
+                    {session?.user && !hasEsvKey && (
+                      <p className="text-sm mt-2 opacity-75">
+                        Add ESV API key in Settings for real scripture text
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -337,6 +392,9 @@ export default function ScripturePage() {
                     <p>\u2713 Font size optimized within 39-49pt range</p>
                     <p>\u2713 No orphaned verses or 3+1 splits</p>
                     <p>\u2713 Intelligent verse distribution applied</p>
+                    {session?.user && hasEsvKey && (
+                      <p>\u2713 Using real ESV scripture text</p>
+                    )}
                   </div>
                 </div>
               </div>
