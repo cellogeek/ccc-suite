@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from "react";
@@ -72,19 +71,19 @@ export default function SettingsPage() {
         const data = await response.json();
         if (data.passages && data.passages.length > 0) {
           setKeyTestResult('success');
-          setSaveMessage('\u2705 ESV API key is valid!');
+          setSaveMessage('✅ ESV API key is valid!');
         } else {
           setKeyTestResult('error');
-          setSaveMessage('\u274c Invalid response from ESV API');
+          setSaveMessage('❌ Invalid response from ESV API');
         }
       } else {
         setKeyTestResult('error');
-        setSaveMessage('\u274c Invalid ESV API key');
+        setSaveMessage('❌ Invalid ESV API key');
       }
     } catch (error) {
       console.error('Error testing ESV API key:', error);
       setKeyTestResult('error');
-      setSaveMessage('\u274c Error testing ESV API key');
+      setSaveMessage('❌ Error testing ESV API key');
     } finally {
       setIsTestingKey(false);
       setTimeout(() => setSaveMessage(''), 3000);
@@ -109,11 +108,11 @@ export default function SettingsPage() {
         autoSave
       });
 
-      setSaveMessage('\u2705 Settings saved successfully!');
+      setSaveMessage('✅ Settings saved successfully!');
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
       console.error('Error saving settings:', error);
-      setSaveMessage('\u274c Error saving settings. Please try again.');
+      setSaveMessage('❌ Error saving settings. Please try again.');
       setTimeout(() => setSaveMessage(''), 3000);
     } finally {
       setIsSaving(false);
