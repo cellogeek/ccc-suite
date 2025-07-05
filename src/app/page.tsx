@@ -8,6 +8,7 @@ import { supabaseService } from "../services/supabaseService";
 import { Slide, ComplianceReport } from "../types/scripture";
 import AuthButton from "../components/AuthButton";
 import { useSession } from "next-auth/react";
+import { Key } from "lucide-react";
 
 export default function Home() {
   const { data: session } = useSession();
@@ -17,11 +18,31 @@ export default function Home() {
   const [complianceReport, setComplianceReport] = useState<ComplianceReport | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasEsvKey, setHasEsvKey] = useState(false);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      checkEsvApiKey();
+    }
+  }, [session]);
+
+  const checkEsvApiKey = async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const esvKey = await supabaseService.getEsvApiKey(session.user.id);
+      setHasEsvKey(!!esvKey);
+    } catch (error) {
+      console.error('Error checking ESV API key:', error);
+    }
+  };
 
   const generateSlides = async () => {
     setIsLoading(true);
     try {
-      const result = await scriptureService.generateSlides(scriptureRef);
+      const result = await scriptureService.generateSlides(scriptureRef, {
+        userId: session?.user?.id // Pass userId to enable ESV API
+      });
       setSlides(result.slides);
       setComplianceReport(result.complianceReport);
       
@@ -183,6 +204,29 @@ export default function Home() {
                 )}
               </div>
 
+              {/* ESV API Status */}
+              {session?.user && (
+                <div className="mt-6 p-4 bg-blue-50/50 rounded-lg border border-blue-200/50">
+                  <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center space-x-2">
+                    <Key className="w-4 h-4" />
+                    <span>Scripture Text</span>
+                  </h3>
+                  {hasEsvKey ? (
+                    <p className="text-sm text-green-700">\u2705 Using real ESV scripture text</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm text-blue-700">\u26a0\ufe0f Using placeholder text</p>
+                      <a
+                        href="/settings"
+                        className="inline-block text-sm text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        Add ESV API key for real scripture \u2192
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* CCC Rules Summary */}
               <div className="mt-6 p-4 bg-primary-50/50 rounded-lg border border-primary-200/50">
                 <h3 className="text-sm font-semibold text-primary-800 mb-2">CCC Rules Applied</h3>
@@ -256,6 +300,11 @@ export default function Home() {
                     </div>
                     <p className="text-lg">Enter a scripture reference to generate slides</p>
                     <p className="text-sm mt-2 opacity-75">CCC rules will be automatically applied</p>
+                    {session?.user && !hasEsvKey && (
+                      <p className="text-sm mt-2 opacity-75">
+                        Sign in and add ESV API key for real scripture text
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -287,6 +336,15 @@ export default function Home() {
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                     <span className="text-green-800 font-medium">100% CCC Rule Compliance</span>
+                  </div>
+                  <div className="mt-3 text-sm text-green-700">
+                    <p>\u2713 All slides contain minimum 2 verses</p>
+                    <p>\u2713 Font size optimized within 39-49pt range</p>
+                    <p>\u2713 No orphaned verses or 3+1 splits</p>
+                    <p>\u2713 Intelligent verse distribution applied</p>
+                    {session?.user && hasEsvKey && (
+                      <p>\u2713 Using real ESV scripture text</p>
+                    )}
                   </div>
                 </div>
               </div>
