@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Download, FileText, Settings, CheckSquare, Square, Archive } from "lucide-react";
 import AuthButton from "../../components/AuthButton";
-import { firestoreService } from "../../services/firestoreService";
+import { supabaseService } from "../../services/supabaseService";
 
 interface ExportablePresentation {
   id: string;
@@ -36,7 +36,7 @@ export default function ExportPage() {
     }
 
     try {
-      const userPresentations = await firestoreService.getUserPresentations(session.user.id);
+      const userPresentations = await supabaseService.getUserPresentations(session.user.id);
       setPresentations(userPresentations.map(p => ({ ...p, selected: false })));
     } catch (error) {
       console.error('Error loading presentations:', error);
@@ -46,14 +46,14 @@ export default function ExportPage() {
   };
 
   const toggleSelection = (id: string) => {
-    setPresentations(prev => 
+    setPresentations(prev =>
       prev.map(p => p.id === id ? { ...p, selected: !p.selected } : p)
     );
   };
 
   const selectAll = () => {
     const allSelected = presentations.every(p => p.selected);
-    setPresentations(prev => 
+    setPresentations(prev =>
       prev.map(p => ({ ...p, selected: !allSelected }))
     );
   };
@@ -67,13 +67,14 @@ export default function ExportPage() {
     if (selected.length === 0) return;
 
     const references = selected.map(p => p.scriptureReference).join(', ');
-    const title = selected.length === 1 
+    const title = selected.length === 1
       ? `Scripture: ${selected[0].scriptureReference}`
       : `Scripture Study: ${references}`;
-    
-    const description = `Join us for today's scripture presentation featuring ${references}. 
-    
+
+    const description = `Join us for today's scripture presentation featuring ${references}.
+
 Presented by Canyon Country Freewill Baptist Church Media Team.
+
 Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
 
 #Scripture #Church #Bible #CanyonCountry #FreewillBaptist`;
@@ -90,10 +91,9 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
     }
 
     setIsExporting(true);
-    
     try {
       const { scriptureService } = await import("../../services/scriptureService");
-      
+
       if (exportType === 'individual') {
         // Export each presentation as a separate file
         for (const presentation of selected) {
@@ -102,7 +102,7 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
             { format: exportFormat },
             presentation.scriptureReference
           );
-          
+
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -111,7 +111,7 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          
+
           // Small delay between downloads
           await new Promise(resolve => setTimeout(resolve, 500));
         }
@@ -119,13 +119,13 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
         // Combine all slides into one file
         const allSlides = selected.flatMap(p => p.slides);
         const combinedReference = selected.map(p => p.scriptureReference).join(', ');
-        
+
         const blob = await scriptureService.exportSlides(
           allSlides,
           { format: exportFormat },
           `Combined: ${combinedReference}`
         );
-        
+
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -138,23 +138,23 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
         // Create a ZIP archive with all files
         const JSZip = (await import('jszip')).default;
         const zip = new JSZip();
-        
+
         for (const presentation of selected) {
           const blob = await scriptureService.exportSlides(
             presentation.slides,
             { format: exportFormat },
             presentation.scriptureReference
           );
-          
+
           const arrayBuffer = await blob.arrayBuffer();
           zip.file(`${presentation.title.replace(/[^a-zA-Z0-9]/g, '_')}.${exportFormat}`, arrayBuffer);
         }
-        
+
         // Add Castr content if available
         if (castrTitle && castrDescription) {
           zip.file('castr_content.txt', `TITLE:\n${castrTitle}\n\nDESCRIPTION:\n${castrDescription}`);
         }
-        
+
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         const url = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
@@ -165,7 +165,7 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
-      
+
       alert(`Successfully exported ${selected.length} presentation(s)!`);
     } catch (error) {
       console.error('Error exporting presentations:', error);
@@ -190,7 +190,7 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
             <AuthButton />
           </div>
         </header>
-        
+
         <main className="container mx-auto px-4 py-8">
           <div className="glass-card p-12 text-center animate-slide-up">
             <Download className="w-16 h-16 mx-auto text-accent-400 mb-4" />
@@ -224,7 +224,6 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
           {/* Export Settings Panel */}
           <div className="lg:col-span-1">
             <div className="glass-card p-6 animate-slide-up">
@@ -232,7 +231,7 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
                 <Settings className="w-5 h-5" />
                 <span>Export Settings</span>
               </h2>
-              
+
               <div className="space-y-4">
                 {/* Format Selection */}
                 <div>
@@ -311,12 +310,12 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
             </div>
 
             {/* Castr Integration */}
-            <div className="glass-card p-6 mt-6 animate-slide-up" style={{animationDelay: '0.1s'}}>
+            <div className="glass-card p-6 mt-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
               <h2 className="text-xl font-semibold text-primary-800 mb-4 flex items-center space-x-2">
                 <FileText className="w-5 h-5" />
                 <span>Castr Integration</span>
               </h2>
-              
+
               <div className="space-y-4">
                 <button
                   onClick={generateCastrContent}
@@ -371,12 +370,11 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
 
           {/* Presentations Selection Panel */}
           <div className="lg:col-span-2">
-            <div className="glass-card p-6 animate-slide-up" style={{animationDelay: '0.2s'}}>
+            <div className="glass-card p-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-primary-800">
                   Select Presentations
                 </h2>
-                
                 <button
                   onClick={selectAll}
                   className="glass-button px-4 py-2 text-sm text-accent-700 hover:text-primary-700 transition-colors flex items-center space-x-2"
@@ -391,7 +389,7 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
                   </span>
                 </button>
               </div>
-              
+
               {isLoading ? (
                 <div className="text-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-600 border-t-transparent mx-auto mb-4"></div>
@@ -408,11 +406,10 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
                   {presentations.map((presentation) => (
                     <div
                       key={presentation.id}
-                      className={`p-4 rounded-lg border transition-all cursor-pointer ${
-                        presentation.selected
-                          ? 'bg-primary-50/80 border-primary-300 shadow-soft'
-                          : 'bg-accent-50/30 border-accent-200/50 hover:bg-primary-50/50'
-                      }`}
+                      className={`p-4 rounded-lg border transition-all cursor-pointer ${presentation.selected
+                        ? 'bg-primary-50/80 border-primary-300 shadow-soft'
+                        : 'bg-accent-50/30 border-accent-200/50 hover:bg-primary-50/50'
+                        }`}
                       onClick={() => toggleSelection(presentation.id)}
                     >
                       <div className="flex items-center space-x-3">
@@ -423,7 +420,6 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
                             <Square className="w-5 h-5 text-accent-400" />
                           )}
                         </div>
-                        
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-accent-800 truncate">
                             {presentation.title}
@@ -445,7 +441,7 @@ Generated with CCC Suite - 100% CCC Rule Compliant Scripture Slides.
 
             {/* Export Summary */}
             {getSelectedPresentations().length > 0 && (
-              <div className="glass-card p-6 mt-6 animate-slide-up" style={{animationDelay: '0.3s'}}>
+              <div className="glass-card p-6 mt-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
                 <h2 className="text-lg font-semibold text-primary-800 mb-4">Export Summary</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                   <div>
