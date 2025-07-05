@@ -1,65 +1,48 @@
+
 'use client';
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Settings, Key, User, Database, Palette, Save, Eye, EyeOff } from "lucide-react";
+import { Settings, Key, Save, Eye, EyeOff, ExternalLink, CheckCircle } from "lucide-react";
 import AuthButton from "../../components/AuthButton";
 import { supabaseService } from "../../services/supabaseService";
 
-interface UserSettings {
-  esvApiKey: string;
-  defaultFontSize: number;
-  defaultExportFormat: 'rtf' | 'txt' | 'pro';
-  autoSave: boolean;
-  theme: 'light' | 'dark' | 'auto';
-  notifications: boolean;
-}
-
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const [settings, setSettings] = useState<UserSettings>({
-    esvApiKey: '',
-    defaultFontSize: 46,
-    defaultExportFormat: 'rtf',
-    autoSave: true,
-    theme: 'light',
-    notifications: true
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [esvApiKey, setEsvApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
-  const [testingApiKey, setTestingApiKey] = useState(false);
-  const [apiKeyValid, setApiKeyValid] = useState<boolean | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [keyTestResult, setKeyTestResult] = useState<'success' | 'error' | null>(null);
+
+  // Default settings
+  const [defaultFontSize, setDefaultFontSize] = useState(46);
+  const [defaultMaxVerses, setDefaultMaxVerses] = useState(4);
+  const [defaultExportFormat, setDefaultExportFormat] = useState<'rtf' | 'txt' | 'pro'>('rtf');
+  const [autoSave, setAutoSave] = useState(true);
 
   useEffect(() => {
-    loadSettings();
+    if (session?.user?.id) {
+      loadSettings();
+    } else {
+      setIsLoading(false);
+    }
   }, [session]);
 
   const loadSettings = async () => {
-    setIsLoading(true);
+    if (!session?.user?.id) return;
+
     try {
-      // Load from localStorage first
-      const localSettings = {
-        esvApiKey: localStorage.getItem('esvApiKey') || '',
-        defaultFontSize: parseInt(localStorage.getItem('defaultFontSize') || '46'),
-        defaultExportFormat: (localStorage.getItem('defaultExportFormat') || 'rtf') as 'rtf' | 'txt' | 'pro',
-        autoSave: localStorage.getItem('autoSave') !== 'false',
-        theme: (localStorage.getItem('theme') || 'light') as 'light' | 'dark' | 'auto',
-        notifications: localStorage.getItem('notifications') !== 'false'
-      };
-
-      setSettings(localSettings);
-
-      // If user is logged in, try to load from database
-      if (session?.user?.id) {
-        try {
-          const dbSettings = await supabaseService.getUserSettings(session.user.id);
-          if (dbSettings) {
-            setSettings({ ...localSettings, ...dbSettings });
-          }
-        } catch (error) {
-          console.error('Error loading settings from database:', error);
-        }
+      // Load user's ESV API key and settings from Supabase
+      const settings = await supabaseService.getUserSettings(session.user.id);
+      if (settings) {
+        setEsvApiKey(settings.esvApiKey || '');
+        setDefaultFontSize(settings.defaultFontSize || 46);
+        setDefaultMaxVerses(settings.defaultMaxVerses || 4);
+        setDefaultExportFormat(settings.defaultExportFormat || 'rtf');
+        setAutoSave(settings.autoSave !== false);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -68,82 +51,102 @@ export default function SettingsPage() {
     }
   };
 
-  const saveSettings = async () => {
-    setIsSaving(true);
+  const testEsvApiKey = async () => {
+    if (!esvApiKey.trim()) {
+      alert('Please enter an ESV API key first');
+      return;
+    }
+
+    setIsTestingKey(true);
+    setKeyTestResult(null);
+
     try {
-      // Save to localStorage
-      localStorage.setItem('esvApiKey', settings.esvApiKey);
-      localStorage.setItem('defaultFontSize', settings.defaultFontSize.toString());
-      localStorage.setItem('defaultExportFormat', settings.defaultExportFormat);
-      localStorage.setItem('autoSave', settings.autoSave.toString());
-      localStorage.setItem('theme', settings.theme);
-      localStorage.setItem('notifications', settings.notifications.toString());
+      // Test the API key with a simple verse request
+      const response = await fetch(`https://api.esv.org/v3/passage/text/?q=John+3:16&include-headings=false&include-footnotes=false&include-verse-numbers=false&include-short-copyright=false&include-passage-references=false`, {
+        headers: {
+          'Authorization': `Token ${esvApiKey.trim()}`
+        }
+      });
 
-      // Save to database if user is logged in
-      if (session?.user?.id) {
-        await supabaseService.saveUserSettings(session.user.id, settings);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.passages && data.passages.length > 0) {
+          setKeyTestResult('success');
+          setSaveMessage('\u2705 ESV API key is valid!');
+        } else {
+          setKeyTestResult('error');
+          setSaveMessage('\u274c Invalid response from ESV API');
+        }
+      } else {
+        setKeyTestResult('error');
+        setSaveMessage('\u274c Invalid ESV API key');
       }
+    } catch (error) {
+      console.error('Error testing ESV API key:', error);
+      setKeyTestResult('error');
+      setSaveMessage('\u274c Error testing ESV API key');
+    } finally {
+      setIsTestingKey(false);
+      setTimeout(() => setSaveMessage(''), 3000);
+    }
+  };
 
-      alert('Settings saved successfully!');
+  const saveSettings = async () => {
+    if (!session?.user?.id) {
+      alert('Please sign in to save settings');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveMessage('');
+
+    try {
+      await supabaseService.saveUserSettings(session.user.id, {
+        esvApiKey: esvApiKey.trim(),
+        defaultFontSize,
+        defaultMaxVerses,
+        defaultExportFormat,
+        autoSave
+      });
+
+      setSaveMessage('\u2705 Settings saved successfully!');
+      setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Error saving settings. Please try again.');
+      setSaveMessage('\u274c Error saving settings. Please try again.');
+      setTimeout(() => setSaveMessage(''), 3000);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const testApiKey = async () => {
-    if (!settings.esvApiKey.trim()) {
-      alert('Please enter an API key first.');
-      return;
-    }
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+        <header className="glass-card mx-4 mt-4 p-6 animate-slide-down">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Settings className="w-8 h-8 text-primary-600" />
+              <div>
+                <h1 className="church-header">Settings</h1>
+                <p className="text-accent-600 text-sm">Configure Your Preferences</p>
+              </div>
+            </div>
+            <AuthButton />
+          </div>
+        </header>
 
-    setTestingApiKey(true);
-    try {
-      const response = await fetch('https://api.esv.org/v3/passage/text/?q=John+3:16', {
-        headers: {
-          'Authorization': `Token ${settings.esvApiKey}`
-        }
-      });
-
-      if (response.ok) {
-        setApiKeyValid(true);
-        alert('API key is valid! ✓');
-      } else {
-        setApiKeyValid(false);
-        alert('API key is invalid or expired. Please check your key.');
-      }
-    } catch (error) {
-      console.error('Error testing API key:', error);
-      setApiKeyValid(false);
-      alert('Error testing API key. Please check your internet connection.');
-    } finally {
-      setTestingApiKey(false);
-    }
-  };
-
-  const resetSettings = () => {
-    if (confirm('Are you sure you want to reset all settings to defaults?')) {
-      const defaultSettings: UserSettings = {
-        esvApiKey: '',
-        defaultFontSize: 46,
-        defaultExportFormat: 'rtf',
-        autoSave: true,
-        theme: 'light',
-        notifications: true
-      };
-      setSettings(defaultSettings);
-      setApiKeyValid(null);
-    }
-  };
-
-  const updateSetting = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    if (key === 'esvApiKey') {
-      setApiKeyValid(null);
-    }
-  };
+        <main className="container mx-auto px-4 py-8">
+          <div className="glass-card p-12 text-center animate-slide-up">
+            <Settings className="w-16 h-16 mx-auto text-accent-400 mb-4" />
+            <h2 className="text-2xl font-semibold text-accent-800 mb-2">Sign In Required</h2>
+            <p className="text-accent-600 mb-6">Please sign in to access your settings.</p>
+            <AuthButton />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
@@ -154,7 +157,7 @@ export default function SettingsPage() {
             <Settings className="w-8 h-8 text-primary-600" />
             <div>
               <h1 className="church-header">Settings</h1>
-              <p className="text-accent-600 text-sm">Manage Your CCC Suite Preferences</p>
+              <p className="text-accent-600 text-sm">Configure Your Preferences</p>
             </div>
           </div>
           <div className="hidden md:flex items-center space-x-4">
@@ -165,285 +168,199 @@ export default function SettingsPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {isLoading ? (
-          <div className="glass-card p-12 text-center animate-slide-up">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-600 border-t-transparent mx-auto mb-4"></div>
-            <p className="text-accent-600">Loading settings...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            {/* API Configuration */}
-            <div className="glass-card p-6 animate-slide-up">
-              <h2 className="text-xl font-semibold text-primary-800 mb-4 flex items-center space-x-2">
-                <Key className="w-5 h-5" />
-                <span>API Configuration</span>
-              </h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="esvApiKey" className="block text-sm font-medium text-accent-700 mb-2">
-                    ESV API Key
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="esvApiKey"
-                      type={showApiKey ? "text" : "password"}
-                      value={settings.esvApiKey}
-                      onChange={(e) => updateSetting('esvApiKey', e.target.value)}
-                      placeholder="Enter your ESV API key"
-                      className="glass-input w-full px-4 py-3 pr-20"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-12 top-1/2 transform -translate-y-1/2 text-accent-500 hover:text-accent-700"
-                    >
-                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                    {apiKeyValid !== null && (
-                      <div className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-3 h-3 rounded-full ${
-                        apiKeyValid ? 'bg-green-500' : 'bg-red-500'
-                      }`} />
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-xs text-accent-500">
-                      Get your free API key at{' '}
-                      <a href="https://api.esv.org" target="_blank" className="text-primary-600 hover:underline">
-                        api.esv.org
-                      </a>
-                    </p>
-                    <button
-                      onClick={testApiKey}
-                      disabled={testingApiKey || !settings.esvApiKey.trim()}
-                      className="text-xs text-primary-600 hover:text-primary-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {testingApiKey ? 'Testing...' : 'Test Key'}
-                    </button>
-                  </div>
-                </div>
+        <div className="max-w-4xl mx-auto space-y-6">
+          
+          {/* ESV API Key Section */}
+          <div className="glass-card p-6 animate-slide-up">
+            <h2 className="text-xl font-semibold text-primary-800 mb-4 flex items-center space-x-2">
+              <Key className="w-5 h-5" />
+              <span>ESV API Configuration</span>
+            </h2>
 
-                <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-200/50">
-                  <h4 className="text-sm font-semibold text-blue-800 mb-2">About ESV API</h4>
-                  <ul className="text-xs text-blue-700 space-y-1">
-                    <li>• Free tier: 5,000 requests per day</li>
-                    <li>• Provides accurate scripture text</li>
-                    <li>• Enhances CCC rule compliance</li>
-                    <li>• Optional - works without API key</li>
-                  </ul>
-                </div>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50/50 border border-blue-200/50 rounded-lg">
+                <h3 className="text-sm font-semibold text-blue-800 mb-2">Get Your Free ESV API Key</h3>
+                <p className="text-sm text-blue-700 mb-3">
+                  To display actual scripture text instead of placeholders, you'll need a free ESV API key from Crossway.
+                </p>
+                <a
+                  href="https://api.esv.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  <span>Get Free ESV API Key</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               </div>
-            </div>
 
-            {/* Presentation Defaults */}
-            <div className="glass-card p-6 animate-slide-up" style={{animationDelay: '0.1s'}}>
-              <h2 className="text-xl font-semibold text-primary-800 mb-4 flex items-center space-x-2">
-                <Palette className="w-5 h-5" />
-                <span>Presentation Defaults</span>
-              </h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="defaultFontSize" className="block text-sm font-medium text-accent-700 mb-2">
-                    Default Font Size (39-49pt)
-                  </label>
-                  <div className="flex items-center space-x-4">
-                    <input
-                      id="defaultFontSize"
-                      type="range"
-                      min="39"
-                      max="49"
-                      value={settings.defaultFontSize}
-                      onChange={(e) => updateSetting('defaultFontSize', parseInt(e.target.value))}
-                      className="flex-1"
-                    />
-                    <span className="text-sm font-medium text-accent-800 w-12">
-                      {settings.defaultFontSize}pt
-                    </span>
-                  </div>
-                  <p className="text-xs text-accent-500 mt-1">
-                    CCC recommended: 46pt (optimal readability)
-                  </p>
-                </div>
-
-                <div>
-                  <label htmlFor="defaultExportFormat" className="block text-sm font-medium text-accent-700 mb-2">
-                    Default Export Format
-                  </label>
-                  <select
-                    id="defaultExportFormat"
-                    value={settings.defaultExportFormat}
-                    onChange={(e) => updateSetting('defaultExportFormat', e.target.value as 'rtf' | 'txt' | 'pro')}
-                    className="glass-input w-full px-4 py-3"
+              <div>
+                <label className="block text-sm font-medium text-accent-700 mb-2">
+                  ESV API Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? "text" : "password"}
+                    value={esvApiKey}
+                    onChange={(e) => setEsvApiKey(e.target.value)}
+                    placeholder="Enter your ESV API key here..."
+                    className="glass-input w-full px-4 py-3 pr-12 text-accent-800 placeholder-accent-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-accent-400 hover:text-accent-600"
                   >
-                    <option value="rtf">RTF (Apple Pages) - Recommended</option>
-                    <option value="txt">TXT (Plain Text)</option>
-                    <option value="pro">PRO (ProPresenter)</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label htmlFor="autoSave" className="text-sm font-medium text-accent-700">
-                      Auto-save presentations
-                    </label>
-                    <p className="text-xs text-accent-500">
-                      Automatically save when signed in
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      id="autoSave"
-                      type="checkbox"
-                      checked={settings.autoSave}
-                      onChange={(e) => updateSetting('autoSave', e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-accent-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-accent-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                  </label>
+                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* User Preferences */}
-            <div className="glass-card p-6 animate-slide-up" style={{animationDelay: '0.2s'}}>
-              <h2 className="text-xl font-semibold text-primary-800 mb-4 flex items-center space-x-2">
-                <User className="w-5 h-5" />
-                <span>User Preferences</span>
-              </h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="theme" className="block text-sm font-medium text-accent-700 mb-2">
-                    Theme
-                  </label>
-                  <select
-                    id="theme"
-                    value={settings.theme}
-                    onChange={(e) => updateSetting('theme', e.target.value as 'light' | 'dark' | 'auto')}
-                    className="glass-input w-full px-4 py-3"
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="auto">Auto (System)</option>
-                  </select>
-                </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={testEsvApiKey}
+                  disabled={isTestingKey || !esvApiKey.trim()}
+                  className="glass-button px-4 py-2 text-secondary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isTestingKey ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-secondary-600 border-t-transparent"></div>
+                      <span>Testing...</span>
+                    </div>
+                  ) : (
+                    'Test API Key'
+                  )}
+                </button>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label htmlFor="notifications" className="text-sm font-medium text-accent-700">
-                      Enable notifications
-                    </label>
-                    <p className="text-xs text-accent-500">
-                      Get notified about updates and features
-                    </p>
+                {keyTestResult === 'success' && (
+                  <div className="flex items-center space-x-2 text-green-600">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm">Valid</span>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      id="notifications"
-                      type="checkbox"
-                      checked={settings.notifications}
-                      onChange={(e) => updateSetting('notifications', e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-accent-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-accent-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                  </label>
-                </div>
+                )}
               </div>
-            </div>
 
-            {/* Account Information */}
-            <div className="glass-card p-6 animate-slide-up" style={{animationDelay: '0.3s'}}>
-              <h2 className="text-xl font-semibold text-primary-800 mb-4 flex items-center space-x-2">
-                <Database className="w-5 h-5" />
-                <span>Account Information</span>
-              </h2>
-              
-              {session ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-accent-700 mb-1">
-                      Email
-                    </label>
-                    <p className="text-accent-800">{session.user?.email}</p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-accent-700 mb-1">
-                      Name
-                    </label>
-                    <p className="text-accent-800">{session.user?.name || 'Not provided'}</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-accent-700 mb-1">
-                      Account Type
-                    </label>
-                    <p className="text-accent-800">Free Account</p>
-                  </div>
-
-                  <div className="p-4 bg-green-50/50 rounded-lg border border-green-200/50">
-                    <h4 className="text-sm font-semibold text-green-800 mb-2">✓ Account Benefits</h4>
-                    <ul className="text-xs text-green-700 space-y-1">
-                      <li>• Cloud storage for presentations</li>
-                      <li>• Cross-device synchronization</li>
-                      <li>• Automatic backups</li>
-                      <li>• Settings persistence</li>
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <User className="w-12 h-12 mx-auto text-accent-400 mb-4" />
-                  <p className="text-accent-600 mb-4">Sign in to access account features</p>
-                  <AuthButton />
+              {saveMessage && (
+                <div className="p-3 bg-accent-50 border border-accent-200 rounded-lg">
+                  <p className="text-sm text-accent-700">{saveMessage}</p>
                 </div>
               )}
             </div>
           </div>
-        )}
 
-        {/* Action Buttons */}
-        <div className="flex justify-center space-x-4 mt-8">
-          <button
-            onClick={saveSettings}
-            disabled={isSaving}
-            className="glass-button px-8 py-3 text-primary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSaving ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-600 border-t-transparent"></div>
-                <span>Saving...</span>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2">
-                <Save className="w-4 h-4" />
-                <span>Save Settings</span>
-              </div>
-            )}
-          </button>
-          
-          <button
-            onClick={resetSettings}
-            className="glass-button px-8 py-3 text-accent-700 font-medium hover:text-red-600 transition-colors"
-          >
-            Reset to Defaults
-          </button>
-        </div>
+          {/* Default Settings Section */}
+          <div className="glass-card p-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <h2 className="text-xl font-semibold text-primary-800 mb-4">
+              Default Slide Settings
+            </h2>
 
-        {/* CCC Suite Info */}
-        <div className="glass-card p-6 mt-8 text-center animate-slide-up" style={{animationDelay: '0.4s'}}>
-          <h3 className="text-lg font-semibold text-primary-800 mb-2">CCC Suite v1.0</h3>
-          <p className="text-accent-600 text-sm mb-4">
-            Built for Canyon Country Freewill Baptist Church Media Team
-          </p>
-          <div className="flex justify-center space-x-6 text-xs text-accent-500">
-            <span>100% CCC Rule Compliant</span>
-            <span>•</span>
-            <span>Multi-format Export</span>
-            <span>•</span>
-            <span>Cloud Sync</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-accent-700 mb-2">
+                  Default Font Size (39-49pt)
+                </label>
+                <input
+                  type="range"
+                  min="39"
+                  max="49"
+                  value={defaultFontSize}
+                  onChange={(e) => setDefaultFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+                <div className="text-center text-sm text-accent-600 mt-1">
+                  {defaultFontSize}pt
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-accent-700 mb-2">
+                  Default Max Verses Per Slide
+                </label>
+                <select
+                  value={defaultMaxVerses}
+                  onChange={(e) => setDefaultMaxVerses(Number(e.target.value))}
+                  className="glass-input w-full px-4 py-3"
+                >
+                  <option value={2}>2 verses</option>
+                  <option value={3}>3 verses</option>
+                  <option value={4}>4 verses</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-accent-700 mb-2">
+                  Default Export Format
+                </label>
+                <select
+                  value={defaultExportFormat}
+                  onChange={(e) => setDefaultExportFormat(e.target.value as 'rtf' | 'txt' | 'pro')}
+                  className="glass-input w-full px-4 py-3"
+                >
+                  <option value="rtf">RTF (Apple Pages)</option>
+                  <option value="txt">TXT (Plain Text)</option>
+                  <option value="pro">PRO (ProPresenter)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-accent-700 mb-2">
+                  Auto-Save Presentations
+                </label>
+                <div className="flex items-center space-x-3 mt-3">
+                  <input
+                    type="checkbox"
+                    id="autoSave"
+                    checked={autoSave}
+                    onChange={(e) => setAutoSave(e.target.checked)}
+                    className="w-4 h-4 text-primary-600 rounded"
+                  />
+                  <label htmlFor="autoSave" className="text-sm text-accent-700">
+                    Automatically save presentations to cloud when signed in
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="glass-card p-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-primary-800">Save Settings</h3>
+                <p className="text-sm text-accent-600">Your settings will be saved securely and synced across devices.</p>
+              </div>
+              <button
+                onClick={saveSettings}
+                disabled={isSaving}
+                className="glass-button px-6 py-3 text-primary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-600 border-t-transparent"></div>
+                    <span>Saving...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Save className="w-4 h-4" />
+                    <span>Save Settings</span>
+                  </div>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Usage Instructions */}
+          <div className="glass-card p-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+            <h2 className="text-xl font-semibold text-primary-800 mb-4">
+              How to Use ESV API
+            </h2>
+            <div className="space-y-3 text-sm text-accent-700">
+              <p>1. <strong>Get your free API key</strong> from <a href="https://api.esv.org/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">api.esv.org</a></p>
+              <p>2. <strong>Enter and test</strong> your API key above</p>
+              <p>3. <strong>Save your settings</strong> - your key will be stored securely</p>
+              <p>4. <strong>Generate scripture slides</strong> - you'll now see actual ESV text instead of placeholders</p>
+              <p>5. <strong>Your key is private</strong> - only you can see and use your ESV API key</p>
+            </div>
           </div>
         </div>
       </main>
