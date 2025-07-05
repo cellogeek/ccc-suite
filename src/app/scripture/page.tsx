@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from "react";
@@ -220,16 +219,16 @@ export default function ScripturePage() {
                     <p className="text-sm text-blue-700">Checking ESV API key...</p>
                   ) : hasEsvKey ? (
                     <div className="space-y-2">
-                      <p className="text-sm text-green-700">\u2705 ESV API key configured - using real scripture text</p>
+                      <p className="text-sm text-green-700">✅ ESV API key configured - using real scripture text</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-sm text-blue-700">\u26a0\ufe0f No ESV API key - using placeholder text</p>
+                      <p className="text-sm text-blue-700">⚠️ No ESV API key - using placeholder text</p>
                       <a
                         href="/settings"
                         className="inline-block text-sm text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        Add ESV API key in Settings \u2192
+                        Add ESV API key in Settings →
                       </a>
                     </div>
                   )}
@@ -240,11 +239,11 @@ export default function ScripturePage() {
               <div className="mt-6 p-4 bg-primary-50/50 rounded-lg border border-primary-200/50">
                 <h3 className="text-sm font-semibold text-primary-800 mb-2">CCC Rules Applied</h3>
                 <ul className="text-xs text-primary-700 space-y-1">
-                  <li>\u2022 Minimum 2 verses per slide</li>
-                  <li>\u2022 Font size: 39-49pt (target 46pt)</li>
-                  <li>\u2022 No 3+1 splits (redistribute as 2+2)</li>
-                  <li>\u2022 Orphan prevention</li>
-                  <li>\u2022 Intelligent sizing</li>
+                  <li>• Minimum 2 verses per slide</li>
+                  <li>• Font size: 39-49pt (target 46pt)</li>
+                  <li>• No 3+1 splits (redistribute as 2+2)</li>
+                  <li>• Orphan prevention</li>
+                  <li>• Intelligent sizing</li>
                 </ul>
               </div>
             </div>
@@ -388,12 +387,12 @@ export default function ScripturePage() {
                     <span className="text-green-800 font-medium">100% CCC Rule Compliance</span>
                   </div>
                   <div className="mt-3 text-sm text-green-700">
-                    <p>\u2713 All slides contain minimum 2 verses</p>
-                    <p>\u2713 Font size optimized within 39-49pt range</p>
-                    <p>\u2713 No orphaned verses or 3+1 splits</p>
-                    <p>\u2713 Intelligent verse distribution applied</p>
+                    <p>✓ All slides contain minimum 2 verses</p>
+                    <p>✓ Font size optimized within 39-49pt range</p>
+                    <p>✓ No orphaned verses or 3+1 splits</p>
+                    <p>✓ Intelligent verse distribution applied</p>
                     {session?.user && hasEsvKey && (
-                      <p>\u2713 Using real ESV scripture text</p>
+                      <p>✓ Using real ESV scripture text</p>
                     )}
                   </div>
                 </div>
