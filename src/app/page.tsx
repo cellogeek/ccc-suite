@@ -1,9 +1,10 @@
+
 'use client';
 
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { scriptureService } from "../services/scriptureService";
-import { firestoreService } from "../services/firestoreService";
+import { supabaseService } from "../services/supabaseService";
 import { Slide, ComplianceReport } from "../types/scripture";
 import AuthButton from "../components/AuthButton";
 import { useSession } from "next-auth/react";
@@ -31,9 +32,9 @@ export default function Home() {
         timestamp: new Date().toISOString()
       });
 
-      // Auto-save to Firestore if user is logged in
+      // Auto-save to Supabase if user is logged in
       if (session?.user?.id) {
-        await saveToFirestore(result.slides, result.complianceReport);
+        await saveToSupabase(result.slides, result.complianceReport);
       }
     } catch (error) {
       console.error("Error generating slides:", error);
@@ -43,7 +44,7 @@ export default function Home() {
     }
   };
 
-  const saveToFirestore = async (slidesToSave: Slide[], compliance: ComplianceReport) => {
+  const saveToSupabase = async (slidesToSave: Slide[], compliance: ComplianceReport) => {
     if (!session?.user?.id) {
       alert('Please sign in to save presentations');
       return;
@@ -51,7 +52,7 @@ export default function Home() {
 
     setIsSaving(true);
     try {
-      const presentationId = await firestoreService.savePresentation({
+      const presentationId = await supabaseService.savePresentation({
         userId: session.user.id,
         title: scriptureRef,
         scriptureReference: scriptureRef,
@@ -64,7 +65,7 @@ export default function Home() {
       console.log('Presentation saved with ID:', presentationId);
       // Could show a success message here
     } catch (error) {
-      console.error('Error saving to Firestore:', error);
+      console.error('Error saving to Supabase:', error);
       alert('Error saving presentation. Please try again.');
     } finally {
       setIsSaving(false);
@@ -166,7 +167,7 @@ export default function Home() {
                 
                 {session?.user && slides.length > 0 && (
                   <button
-                    onClick={() => saveToFirestore(slides, complianceReport!)}
+                    onClick={() => saveToSupabase(slides, complianceReport!)}
                     disabled={isSaving}
                     className="glass-button w-full px-6 py-3 text-secondary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed mt-2"
                   >
@@ -186,11 +187,11 @@ export default function Home() {
               <div className="mt-6 p-4 bg-primary-50/50 rounded-lg border border-primary-200/50">
                 <h3 className="text-sm font-semibold text-primary-800 mb-2">CCC Rules Applied</h3>
                 <ul className="text-xs text-primary-700 space-y-1">
-                  <li>• Minimum 2 verses per slide</li>
-                  <li>• Font size: 39-49pt (target 46pt)</li>
-                  <li>• No 3+1 splits (redistribute as 2+2)</li>
-                  <li>• Orphan prevention</li>
-                  <li>• Intelligent sizing</li>
+                  <li>\u2022 Minimum 2 verses per slide</li>
+                  <li>\u2022 Font size: 39-49pt (target 46pt)</li>
+                  <li>\u2022 No 3+1 splits (redistribute as 2+2)</li>
+                  <li>\u2022 Orphan prevention</li>
+                  <li>\u2022 Intelligent sizing</li>
                 </ul>
               </div>
             </div>
@@ -298,7 +299,7 @@ export default function Home() {
       <footer className="mt-16 glass-card mx-4 mb-4 p-6 animate-fade-in">
         <div className="text-center text-accent-600">
           <p className="text-sm">
-            © 2025 Canyon Country Freewill Baptist Church Media Team
+            \u00a9 2025 Canyon Country Freewill Baptist Church Media Team
           </p>
           <p className="text-xs mt-1 opacity-75">
             Built with CCC Scripture Service Engine
