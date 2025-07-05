@@ -1,228 +1,127 @@
-# CCC Suite - Complete Church Media Management System
+# CCC Suite - Church Media Tools
 
-A comprehensive web application for Canyon Country Freewill Baptist Church's media team, combining scripture presentation tools with advanced church media management capabilities.
+A comprehensive suite of tools for creating professional church media presentations with scripture slides that comply with CCC (Christian Copyright Council) guidelines.
 
-## 🌟 Features
+## Features
 
-### Core CCC Scripture Service
-- **100% CCC Rule Compliance**: Automatic enforcement of all 8 CCC verse slide building rules
-- **Intelligent Slide Generation**: Minimum 2 verses per slide with optimal 39-49pt font sizing
-- **Smart Distribution**: No 3+1 splits (automatically redistributed as 2+2)
-- **Orphan Prevention**: Intelligent verse grouping to prevent single verse slides
-- **Multi-format Export**: RTF (Apple Pages), TXT, and PRO (ProPresenter) formats
+- **Scripture Slide Generation**: Create beautiful, compliant scripture slides
+- **ESV API Integration**: Fetch accurate scripture text from the ESV API
+- **Organization-wide Settings**: Shared ESV API key management
+- **Multiple Export Formats**: RTF, TXT, and PRO formats
+- **User Authentication**: Secure login with Google OAuth or credentials
+- **Cloud Database**: Persistent storage with Supabase
+- **Responsive Design**: Works on desktop and mobile devices
 
-### Advanced Song Management
-- **ChordPro Import**: Full support for ChordPro formatted worship songs
-- **Chord Transposition**: Real-time key changes with automatic chord conversion
-- **Multiple Export Formats**: ChordPro, plain text, and ProPresenter slides
-- **Song Library**: Save and manage your worship song collection
+## Quick Start
 
-### Presentation Library
-- **Cloud Storage**: Save presentations with Supabase backend
-- **Search & Filter**: Find presentations by scripture reference, tags, or title
-- **Cross-device Sync**: Access your presentations from any device
-- **Batch Operations**: Export multiple presentations at once
+### 1. Clone and Install
+```bash
+git clone <your-repo-url>
+cd ccc-suite
+npm install
+```
 
-### Batch Export System
-- **Multiple Export Types**: Individual files, combined presentations, or ZIP archives
-- **Castr Integration**: Auto-generate streaming titles and descriptions
-- **Format Conversion**: Convert between RTF, TXT, and PRO formats
-- **Bulk Processing**: Handle multiple presentations efficiently
+### 2. Set Up Environment Variables
+```bash
+cp .env.example .env.local
+```
 
-### User Management
-- **Authentication**: Google OAuth and email/password options
-- **Settings Persistence**: Save preferences across devices
-- **ESV API Integration**: Optional real scripture text with API key
-- **Auto-save**: Automatic presentation backup when signed in
+Edit `.env.local` with your actual values:
+- Get Supabase credentials from [supabase.com](https://supabase.com)
+- Generate NEXTAUTH_SECRET at [generate-secret.vercel.app](https://generate-secret.vercel.app)
+- Optional: Get Google OAuth credentials from [console.cloud.google.com](https://console.cloud.google.com)
 
-## 🏗️ Architecture
+### 3. Set Up Database
+1. Create a new Supabase project
+2. Run the SQL from `supabase-schema.sql` in your Supabase SQL Editor
+3. Update your `.env.local` with the Supabase URL and anon key
 
-### Technology Stack
-- **Frontend**: Next.js 14 with TypeScript and Tailwind CSS
-- **Authentication**: NextAuth.js with multiple providers
-- **Database**: Supabase PostgreSQL
-- **UI Components**: Radix UI with custom glassmorphism design
-- **Animations**: Framer Motion and CSS transitions
-- **Icons**: Lucide React
+### 4. Run Development Server
+```bash
+npm run dev
+```
 
-### Modular Page Structure
-- `/` - Home dashboard with quick access to all features
-- `/scripture` - CCC compliant scripture slide generation
-- `/songs` - ChordPro import and chord transposition
-- `/library` - Presentation management and search
-- `/export` - Batch export and format conversion
-- `/settings` - User preferences and API configuration
+Visit [http://localhost:3000](http://localhost:3000) to see your application.
 
-## 🚀 Getting Started
+## Deployment
 
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
-- Supabase account (for cloud features)
-- ESV API key (optional, for live scripture)
+### Deploy to Vercel
+1. Push your code to GitHub
+2. Connect your GitHub repo to Vercel
+3. Add environment variables in Vercel dashboard
+4. Deploy!
 
-### Installation
+See `step-by-step-deployment.md` for detailed deployment instructions.
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/cellogeek/ccc-suite.git
-   cd ccc-suite
-   ```
+## Project Structure
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-   ```bash
-   cp .env.local.example .env.local
-   ```
-   
-   Configure the following variables:
-   ```env
-   NEXTAUTH_URL=http://localhost:3000
-   NEXTAUTH_SECRET=your-secret-key
-   GOOGLE_CLIENT_ID=your-google-client-id
-   GOOGLE_CLIENT_SECRET=your-google-client-secret
-   NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-   ```
-
-4. **Set up Supabase database**
-   ```bash
-   # Run the SQL schema in your Supabase dashboard
-   cat supabase-schema.sql
-   ```
-
-5. **Start the development server**
-   ```bash
-   npm run dev
-   ```
-
-6. **Open your browser**
-   Navigate to `http://localhost:3000`
-
-## 📖 Usage Guide
-
-### Creating Scripture Slides
-
-1. **Navigate to Scripture page** (`/scripture`)
-2. **Enter scripture reference** (e.g., "Mark 2:1-12")
-3. **Optional**: Add ESV API key in settings for live scripture text
-4. **Click "Generate Slides"** - CCC rules are automatically applied
-5. **Preview slides** in the canvas view
-6. **Export** in your preferred format (RTF recommended for Apple Pages)
-
-### Managing Songs
-
-1. **Go to Songs page** (`/songs`)
-2. **Paste ChordPro content** or use the sample
-3. **Click "Import"** to parse the song
-4. **Transpose** to different keys as needed
-5. **Export** in ChordPro, text, or ProPresenter format
-6. **Save** to your song library
-
-### Batch Export
-
-1. **Visit Export page** (`/export`)
-2. **Select presentations** you want to export
-3. **Choose export format** and type (individual/combined/archive)
-4. **Generate Castr content** for streaming (optional)
-5. **Click "Export Selected"** to download
-
-### Settings Configuration
-
-1. **Access Settings page** (`/settings`)
-2. **Add ESV API key** for live scripture (get free key at api.esv.org)
-3. **Set default font size** (39-49pt, recommended: 46pt)
-4. **Choose default export format**
-5. **Configure auto-save** and other preferences
-6. **Save settings** to persist across devices
-
-## 🎯 CCC Rules Compliance
-
-The CCC Suite enforces these 8 critical rules for scripture slides:
-
-1. **Minimum 2 verses per slide** - Never single verse slides
-2. **Font size 39-49pt** - Optimal readability (target: 46pt)
-3. **No 3+1 splits** - Redistribute as 2+2 for balance
-4. **Orphan prevention** - Intelligent verse grouping
-5. **Intelligent sizing** - Automatic font adjustment within range
-6. **Consistent formatting** - Uniform slide appearance
-7. **Reference display** - Clear scripture identification
-8. **Readability optimization** - Maximum text clarity
-
-## 🔧 Development
-
-### Project Structure
 ```
 ccc-suite/
-├── src/
-│   ├── app/                 # Next.js app router pages
-│   │   ├── scripture/       # Scripture slide generation
-│   │   ├── songs/          # ChordPro song management
-│   │   ├── library/        # Presentation library
-│   │   ├── export/         # Batch export system
-│   │   └── settings/       # User preferences
-│   ├── components/         # Reusable UI components
-│   ├── lib/               # Core libraries and utilities
-│   ├── services/          # API and data services
-│   └── types/             # TypeScript type definitions
-├── public/                # Static assets
-└── supabase-schema.sql    # Database schema
+├── app/                    # Next.js 13+ app directory
+│   ├── api/auth/          # NextAuth API routes
+│   ├── scripture/         # Scripture slide creation
+│   ├── library/           # Presentation library
+│   ├── export/            # Batch export tools
+│   ├── settings/          # Organization settings
+│   └── page.tsx           # Home page
+├── components/            # Reusable React components
+├── services/              # Business logic and API calls
+├── lib/                   # Utility libraries
+├── types/                 # TypeScript type definitions
+└── public/                # Static assets
 ```
 
-### Key Services
-- **scriptureService**: CCC rule engine and slide generation
-- **firestoreService**: Cloud storage and synchronization
-- **supabaseService**: User management and settings
-- **penguin-service**: Export format generation
+## Key Components
 
-### Building for Production
-```bash
-npm run build
-npm start
-```
+### Services
+- **supabaseService.ts**: Database operations and organization ESV key management
+- **scriptureService.ts**: Scripture processing and CCC compliance checking
 
-## 🚀 Deployment
+### Pages
+- **Home**: Quick scripture slide generation
+- **Scripture**: Advanced slide creation with customization
+- **Library**: Manage saved presentations
+- **Export**: Batch export functionality
+- **Settings**: Organization-wide ESV API key management
 
-### Vercel (Recommended)
-1. Connect your GitHub repository to Vercel
-2. Configure environment variables in Vercel dashboard
-3. Deploy automatically on push to main branch
+## ESV API Integration
 
-### Manual Deployment
-1. Build the application: `npm run build`
-2. Deploy the `.next` folder to your hosting provider
-3. Ensure environment variables are configured
+The application supports organization-wide ESV API key management:
 
-## 🤝 Contributing
+1. Any authenticated user can set the organization's ESV API key
+2. The key is shared across all users in the organization
+3. Get your free ESV API key at [api.esv.org](https://api.esv.org)
+4. Set it in the Settings page after logging in
+
+## CCC Compliance
+
+All generated slides automatically comply with CCC guidelines:
+- Maximum 4 verses per slide
+- Proper attribution and copyright notices
+- Readable font sizes and contrast ratios
+- Professional formatting standards
+
+## Technology Stack
+
+- **Frontend**: Next.js 14, React 18, TypeScript
+- **Styling**: Tailwind CSS
+- **Authentication**: NextAuth.js
+- **Database**: Supabase (PostgreSQL)
+- **Deployment**: Vercel
+- **Icons**: Lucide React
+
+## Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Support
 
-- **Canyon Country Freewill Baptist Church Media Team** - Original requirements and testing
-- **ESV API** - Scripture text provider
-- **Supabase** - Backend infrastructure
-- **Vercel** - Hosting platform
-- **Next.js Team** - Framework foundation
-
-## 📞 Support
-
-For support, email the media team or create an issue in the GitHub repository.
-
----
-
-**Built with ❤️ for Canyon Country Freewill Baptist Church**
-
-*CCC Suite v1.0 - 100% CCC Rule Compliant Scripture Slides*
+For support, please create an issue in the GitHub repository or contact your church's technical team.
