@@ -1,22 +1,18 @@
+
 import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { FirestoreAdapter } from '@next-auth/firebase-adapter';
-import { cert } from 'firebase-admin/app';
 
 export const authOptions: NextAuthOptions = {
-  adapter: FirestoreAdapter({
-    credential: cert({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  }),
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
+    // Only include Google if credentials are available
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [
+      GoogleProvider({
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      })
+    ] : []),
+    
     CredentialsProvider({
       name: 'credentials',
       credentials: {
@@ -24,12 +20,8 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        // This is where you would validate credentials
-        // For now, we'll implement basic validation
-        // In production, you'd hash passwords and store in Firestore
-        
+        // Basic validation for development
         if (credentials?.email && credentials?.password) {
-          // Mock user for development
           return {
             id: '1',
             email: credentials.email,
@@ -40,13 +32,11 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
+  
   session: {
     strategy: 'jwt',
   },
-  pages: {
-    signIn: '/auth/signin',
-    signUp: '/auth/signup',
-  },
+  
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
