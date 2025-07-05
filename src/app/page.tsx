@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from "next/image";
@@ -212,15 +211,15 @@ export default function Home() {
                     <span>Scripture Text</span>
                   </h3>
                   {hasEsvKey ? (
-                    <p className="text-sm text-green-700">\u2705 Using real ESV scripture text</p>
+                    <p className="text-sm text-green-700">✅ Using real ESV scripture text</p>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-sm text-blue-700">\u26a0\ufe0f Using placeholder text</p>
+                      <p className="text-sm text-blue-700">⚠️ Using placeholder text</p>
                       <a
                         href="/settings"
                         className="inline-block text-sm text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        Add ESV API key for real scripture \u2192
+                        Add ESV API key for real scripture →
                       </a>
                     </div>
                   )}
@@ -231,11 +230,11 @@ export default function Home() {
               <div className="mt-6 p-4 bg-primary-50/50 rounded-lg border border-primary-200/50">
                 <h3 className="text-sm font-semibold text-primary-800 mb-2">CCC Rules Applied</h3>
                 <ul className="text-xs text-primary-700 space-y-1">
-                  <li>\u2022 Minimum 2 verses per slide</li>
-                  <li>\u2022 Font size: 39-49pt (target 46pt)</li>
-                  <li>\u2022 No 3+1 splits (redistribute as 2+2)</li>
-                  <li>\u2022 Orphan prevention</li>
-                  <li>\u2022 Intelligent sizing</li>
+                  <li>• Minimum 2 verses per slide</li>
+                  <li>• Font size: 39-49pt (target 46pt)</li>
+                  <li>• No 3+1 splits (redistribute as 2+2)</li>
+                  <li>• Orphan prevention</li>
+                  <li>• Intelligent sizing</li>
                 </ul>
               </div>
             </div>
@@ -338,12 +337,12 @@ export default function Home() {
                     <span className="text-green-800 font-medium">100% CCC Rule Compliance</span>
                   </div>
                   <div className="mt-3 text-sm text-green-700">
-                    <p>\u2713 All slides contain minimum 2 verses</p>
-                    <p>\u2713 Font size optimized within 39-49pt range</p>
-                    <p>\u2713 No orphaned verses or 3+1 splits</p>
-                    <p>\u2713 Intelligent verse distribution applied</p>
+                    <p>✓ All slides contain minimum 2 verses</p>
+                    <p>✓ Font size optimized within 39-49pt range</p>
+                    <p>✓ No orphaned verses or 3+1 splits</p>
+                    <p>✓ Intelligent verse distribution applied</p>
                     {session?.user && hasEsvKey && (
-                      <p>\u2713 Using real ESV scripture text</p>
+                      <p>✓ Using real ESV scripture text</p>
                     )}
                   </div>
                 </div>
@@ -357,7 +356,7 @@ export default function Home() {
       <footer className="mt-16 glass-card mx-4 mb-4 p-6 animate-fade-in">
         <div className="text-center text-accent-600">
           <p className="text-sm">
-            \u00a9 2025 Canyon Country Freewill Baptist Church Media Team
+            © 2025 Canyon Country Freewill Baptist Church Media Team
           </p>
           <p className="text-xs mt-1 opacity-75">
             Built with CCC Scripture Service Engine
