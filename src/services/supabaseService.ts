@@ -14,6 +14,14 @@ export interface PresentationData {
   tags: string[];
 }
 
+export interface UserSettings {
+  esvApiKey?: string;
+  defaultFontSize?: number;
+  defaultMaxVerses?: number;
+  defaultExportFormat?: 'rtf' | 'txt' | 'pro';
+  autoSave?: boolean;
+}
+
 export class SupabaseService {
   private static instance: SupabaseService;
 
@@ -28,7 +36,13 @@ export class SupabaseService {
   async savePresentation(presentation: Omit<PresentationData, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
       const presentationData = {
-        ...presentation,
+        user_id: presentation.userId,
+        title: presentation.title,
+        scripture_reference: presentation.scriptureReference,
+        slides: presentation.slides,
+        compliance_report: presentation.complianceReport,
+        is_public: presentation.isPublic,
+        tags: presentation.tags,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -50,12 +64,20 @@ export class SupabaseService {
   // Update existing presentation
   async updatePresentation(id: string, updates: Partial<PresentationData>): Promise<void> {
     try {
+      const updateData: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.title) updateData.title = updates.title;
+      if (updates.scriptureReference) updateData.scripture_reference = updates.scriptureReference;
+      if (updates.slides) updateData.slides = updates.slides;
+      if (updates.complianceReport) updateData.compliance_report = updates.complianceReport;
+      if (updates.isPublic !== undefined) updateData.is_public = updates.isPublic;
+      if (updates.tags) updateData.tags = updates.tags;
+
       const { error } = await supabase
         .from('presentations')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
@@ -199,6 +221,73 @@ export class SupabaseService {
     } catch (error) {
       console.error('Error searching presentations:', error);
       throw error;
+    }
+  }
+
+  // ===== USER SETTINGS METHODS =====
+
+  // Get user settings
+  async getUserSettings(userId: string): Promise<UserSettings | null> {
+    try {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        throw error;
+      }
+
+      return {
+        esvApiKey: data.esv_api_key,
+        defaultFontSize: data.default_font_size,
+        defaultMaxVerses: data.default_max_verses,
+        defaultExportFormat: data.default_export_format,
+        autoSave: data.auto_save,
+      };
+    } catch (error) {
+      console.error('Error getting user settings:', error);
+      throw error;
+    }
+  }
+
+  // Save user settings
+  async saveUserSettings(userId: string, settings: UserSettings): Promise<void> {
+    try {
+      const settingsData = {
+        user_id: userId,
+        esv_api_key: settings.esvApiKey || null,
+        default_font_size: settings.defaultFontSize || 46,
+        default_max_verses: settings.defaultMaxVerses || 4,
+        default_export_format: settings.defaultExportFormat || 'rtf',
+        auto_save: settings.autoSave !== false,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert([settingsData], { 
+          onConflict: 'user_id',
+          ignoreDuplicates: false 
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving user settings:', error);
+      throw error;
+    }
+  }
+
+  // Get ESV API key for a user (for scripture service)
+  async getEsvApiKey(userId: string): Promise<string | null> {
+    try {
+      const settings = await this.getUserSettings(userId);
+      return settings?.esvApiKey || null;
+    } catch (error) {
+      console.error('Error getting ESV API key:', error);
+      return null;
     }
   }
 }
