@@ -39,7 +39,6 @@ class ScriptureService {
       const data = await response.json();
       
       if (data.passages && data.passages.length > 0) {
-        // Clean up the text - remove extra whitespace and normalize
         return data.passages[0].trim();
       }
       
@@ -53,9 +52,7 @@ class ScriptureService {
   // Parse scripture reference to extract book, chapter, and verses
   parseScriptureReference(reference: string): { book: string; chapter: number; startVerse: number; endVerse: number } | null {
     try {
-      // Handle formats like "Mark 2:1-12", "John 3:16", "1 Corinthians 13:1-13"
       const match = reference.match(/^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$/);
-      
       if (!match) return null;
       
       const book = match[1].trim();
@@ -73,22 +70,16 @@ class ScriptureService {
   // Split ESV text into individual verses
   splitIntoVerses(text: string, startVerse: number): string[] {
     try {
-      // ESV API returns text with verse numbers like "[1] In the beginning..."
       const verses: string[] = [];
-      
-      // Split by verse numbers in brackets
       const parts = text.split(/\[(\d+)\]/);
       
       for (let i = 1; i < parts.length; i += 2) {
-        const verseNumber = parseInt(parts[i]);
         const verseText = parts[i + 1]?.trim();
-        
         if (verseText) {
-          verses.push(`${verseNumber} ${verseText}`);
+          verses.push(`${parts[i]} ${verseText}`);
         }
       }
-      
-      return verses.length > 0 ? verses : [text]; // Fallback to full text if parsing fails
+      return verses.length > 0 ? verses : [text];
     } catch (error) {
       console.error('Error splitting verses:', error);
       return [text];
@@ -119,7 +110,6 @@ class ScriptureService {
     try {
       let verses: string[] = [];
       
-      // Try to get real ESV text if user has API key
       if (userId) {
         const esvApiKey = await supabaseService.getEsvApiKey(userId);
         if (esvApiKey) {
@@ -133,15 +123,11 @@ class ScriptureService {
         }
       }
       
-      // Fallback to placeholder text if no ESV text available
       if (verses.length === 0) {
         verses = this.generatePlaceholderText(reference);
       }
 
-      // Apply CCC rules to create slides
       const slides = this.createCCCCompliantSlides(verses, reference, fontSize, maxVersesPerSlide);
-      
-      // Generate compliance report
       const complianceReport = this.generateComplianceReport(slides, verses.length);
       
       return { slides, complianceReport };
@@ -160,14 +146,12 @@ class ScriptureService {
     for (let i = 0; i < verses.length; i++) {
       currentSlideVerses.push(verses[i]);
       
-      // Check if we should create a slide
       const shouldCreateSlide = 
-        currentSlideVerses.length >= maxVersesPerSlide || // Max verses reached
-        i === verses.length - 1 || // Last verse
-        (currentSlideVerses.length >= 2 && this.wouldCreateOrphan(i, verses.length)); // Prevent orphans
+        currentSlideVerses.length >= maxVersesPerSlide ||
+        i === verses.length - 1 ||
+        (currentSlideVerses.length >= 2 && this.wouldCreateOrphan(i, verses.length));
       
       if (shouldCreateSlide) {
-        // Ensure minimum 2 verses per slide (except for single verse passages)
         if (currentSlideVerses.length >= 2 || verses.length === 1) {
           slides.push(this.createSlide(currentSlideVerses, reference, fontSize, slides.length + 1));
           currentSlideVerses = [];
@@ -175,13 +159,11 @@ class ScriptureService {
       }
     }
     
-    // Handle any remaining verses
     if (currentSlideVerses.length > 0) {
       if (currentSlideVerses.length === 1 && slides.length > 0) {
-        // Redistribute to avoid orphan - add to previous slide
         const lastSlide = slides[slides.length - 1];
-        // *** CHANGE #2: Changed lastSlide.content to lastSlide.text ***
-        lastSlide.text += '\n\n' + currentSlideVerses[0];
+        // *** FIX: Changed back to 'content' which is the correct property name ***
+        lastSlide.content += '\n\n' + currentSlideVerses[0];
       } else {
         slides.push(this.createSlide(currentSlideVerses, reference, fontSize, slides.length + 1));
       }
@@ -193,19 +175,18 @@ class ScriptureService {
   // Check if creating a slide now would leave an orphan
   private wouldCreateOrphan(currentIndex: number, totalVerses: number): boolean {
     const remainingVerses = totalVerses - currentIndex - 1;
-    return remainingVerses === 1; // Would leave exactly 1 verse
+    return remainingVerses === 1;
   }
 
   // Create individual slide
   private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
-    const textContent = verses.join('\n\n');
+    const content = verses.join('\n\n');
     
-    // *** CHANGE #1: Updated this return object to match the shared Slide type ***
+    // *** FIX: This return object now correctly matches the Slide type definition ***
     return {
       id: `slide-${slideNumber}`,
-      title: `${reference} (${slideNumber})`,
-      text: textContent,
-      verses: reference, // Added the missing 'verses' property
+      content: content,
+      reference: `${reference} (${slideNumber})`,
       fontSize,
       backgroundColor: '#000000',
       textColor: '#ffffff',
@@ -220,30 +201,23 @@ class ScriptureService {
   // Generate compliance report
   private generateComplianceReport(slides: Slide[], totalVerses: number): ComplianceReport {
     const issues: any[] = [];
-    const suggestions: string[] = [];
     
-    // Check font size compliance
     slides.forEach((slide, index) => {
       if (slide.fontSize < 39 || slide.fontSize > 49) {
         issues.push({
           type: 'font_size',
-          severity: 'medium',
           message: `Slide ${index + 1} font size (${slide.fontSize}) is outside recommended range`,
-          suggestion: 'Use font size between 39-49 for optimal readability'
         });
       }
     });
     
-    // Check verse count per slide (estimate from content)
     slides.forEach((slide, index) => {
-      // Using 'text' property now
-      const verseCount = (slide.text.match(/\n\n/g) || []).length + 1;
+      // *** FIX: Changed to use 'content' property ***
+      const verseCount = (slide.content.match(/\n\n/g) || []).length + 1;
       if (verseCount > 4) {
         issues.push({
           type: 'verse_count',
-          severity: 'high',
           message: `Slide ${index + 1} has too many verses (${verseCount})`,
-          suggestion: 'Limit slides to maximum 4 verses for better readability'
         });
       }
     });
@@ -251,19 +225,8 @@ class ScriptureService {
     const isCompliant = issues.length === 0;
     const score = Math.max(0, 100 - (issues.length * 10));
     
-    if (isCompliant) {
-      suggestions.push('All slides meet CCC compliance guidelines');
-    }
-    
-    return {
-      isCompliant,
-      issues,
-      suggestions,
-      score
-    };
+    return { isCompliant, issues, suggestions: [], score };
   }
-
-  
 
   // Export slides to various formats
   async exportSlides(slides: Slide[], options: { format: 'rtf' | 'txt' | 'pro' }, reference: string): Promise<Blob> {
@@ -286,13 +249,12 @@ class ScriptureService {
     let rtfContent = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}';
     rtfContent += `\\f0\\fs48 ${reference}\\par\\par`;
     
-    slides.forEach((slide, index) => {
-      // Using 'text' property now
-      rtfContent += `\\page\\f0\\fs${slide.fontSize * 2} ${slide.text.replace(/\n/g, '\\par ')}\\par`;
+    slides.forEach((slide) => {
+      // *** FIX: Changed to use 'content' property ***
+      rtfContent += `\\page\\f0\\fs${slide.fontSize * 2} ${slide.content.replace(/\n/g, '\\par ')}\\par`;
     });
     
     rtfContent += '}';
-    
     return new Blob([rtfContent], { type: 'application/rtf' });
   }
 
@@ -302,8 +264,8 @@ class ScriptureService {
     
     slides.forEach((slide, index) => {
       txtContent += `--- Slide ${index + 1} ---\n`;
-      // Using 'text' property now
-      txtContent += `${slide.text}\n\n`;
+      // *** FIX: Changed to use 'content' property ***
+      txtContent += `${slide.content}\n\n`;
     });
     
     return new Blob([txtContent], { type: 'text/plain' });
@@ -314,11 +276,11 @@ class ScriptureService {
     const proData = {
       presentation: {
         title: reference,
-        slides: slides.map((slide, index) => ({
+        // *** FIX: This object now correctly matches the Slide type ***
+        slides: slides.map((slide) => ({
           id: slide.id,
-          title: slide.title, // Use title property
-          text: slide.text, // Use text property
-          verses: slide.verses, // Use verses property
+          reference: slide.reference,
+          content: slide.content,
           fontSize: slide.fontSize,
           backgroundColor: slide.backgroundColor,
           textColor: slide.textColor,
