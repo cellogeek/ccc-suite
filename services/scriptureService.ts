@@ -111,7 +111,7 @@ class ScriptureService {
       let verses: string[] = [];
       
       if (userId) {
-        const esvApiKey = await supabaseService.getEsvApiKey(userId);
+        const esvApiKey = await supabaseService.getOrganizationEsvApiKey();
         if (esvApiKey) {
           const esvText = await this.fetchEsvText(reference, esvApiKey);
           if (esvText) {
@@ -162,7 +162,6 @@ class ScriptureService {
     if (currentSlideVerses.length > 0) {
       if (currentSlideVerses.length === 1 && slides.length > 0) {
         const lastSlide = slides[slides.length - 1];
-        // *** FIX: Changed back to 'content' which is the correct property name ***
         lastSlide.content += '\n\n' + currentSlideVerses[0];
       } else {
         slides.push(this.createSlide(currentSlideVerses, reference, fontSize, slides.length + 1));
@@ -178,60 +177,49 @@ class ScriptureService {
     return remainingVerses === 1;
   }
 
- // Create individual slide
-private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
-  const content = verses.join('\n\n');
-  
-  return {
-    id: `slide-${slideNumber}`,
-    content,
-    reference: `${reference} (${slideNumber})`,
-    fontSize,
-    backgroundColor: '#000000',
-    textColor: '#ffffff',
-    fontFamily: 'Georgia, serif',
-    textAlign: 'center' as const,
-    verticalAlign: 'middle' as const,
-    padding: 40,
-    lineHeight: 1.4
-  };
-}
+  // Create individual slide
+  private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
+    const content = verses.join('\n\n');
     
-  return {
-  id: `slide-${slideNumber}`,
-  content: content,
-  reference: `${reference} (${slideNumber})`,
-  fontSize,
-  backgroundColor: '#000000',
-  textColor: '#ffffff',
-  fontFamily: 'Georgia, serif',
-  textAlign: 'center',
-  verticalAlign: 'middle',
-  padding: 40,
-  lineHeight: 1.4
-};
-}
+    return {
+      id: `slide-${slideNumber}`,
+      content,
+      reference: `${reference} (${slideNumber})`,
+      fontSize,
+      backgroundColor: '#000000',
+      textColor: '#ffffff',
+      fontFamily: 'Georgia, serif',
+      textAlign: 'center' as const,
+      verticalAlign: 'middle' as const,
+      padding: 40,
+      lineHeight: 1.4
+    };
+  }
 
   // Generate compliance report
   private generateComplianceReport(slides: Slide[], totalVerses: number): ComplianceReport {
     const issues: any[] = [];
+    const suggestions: string[] = [];
     
     slides.forEach((slide, index) => {
       if (slide.fontSize < 39 || slide.fontSize > 49) {
         issues.push({
           type: 'font_size',
+          severity: 'medium',
           message: `Slide ${index + 1} font size (${slide.fontSize}) is outside recommended range`,
+          suggestion: 'Use font size between 39-49 for optimal readability'
         });
       }
     });
     
     slides.forEach((slide, index) => {
-      // *** FIX: Changed to use 'content' property ***
       const verseCount = (slide.content.match(/\n\n/g) || []).length + 1;
       if (verseCount > 4) {
         issues.push({
           type: 'verse_count',
+          severity: 'high',
           message: `Slide ${index + 1} has too many verses (${verseCount})`,
+          suggestion: 'Limit slides to maximum 4 verses for better readability'
         });
       }
     });
@@ -239,7 +227,16 @@ private createSlide(verses: string[], reference: string, fontSize: number, slide
     const isCompliant = issues.length === 0;
     const score = Math.max(0, 100 - (issues.length * 10));
     
-    return { isCompliant, issues, suggestions: [], score };
+    if (isCompliant) {
+      suggestions.push('All slides meet CCC compliance guidelines');
+    }
+    
+    return {
+      isCompliant,
+      issues,
+      suggestions,
+      score
+    };
   }
 
   // Export slides to various formats
@@ -264,7 +261,6 @@ private createSlide(verses: string[], reference: string, fontSize: number, slide
     rtfContent += `\\f0\\fs48 ${reference}\\par\\par`;
     
     slides.forEach((slide) => {
-      // *** FIX: Changed to use 'content' property ***
       rtfContent += `\\page\\f0\\fs${slide.fontSize * 2} ${slide.content.replace(/\n/g, '\\par ')}\\par`;
     });
     
@@ -278,7 +274,6 @@ private createSlide(verses: string[], reference: string, fontSize: number, slide
     
     slides.forEach((slide, index) => {
       txtContent += `--- Slide ${index + 1} ---\n`;
-      // *** FIX: Changed to use 'content' property ***
       txtContent += `${slide.content}\n\n`;
     });
     
@@ -290,7 +285,6 @@ private createSlide(verses: string[], reference: string, fontSize: number, slide
     const proData = {
       presentation: {
         title: reference,
-        // *** FIX: This object now correctly matches the Slide type ***
         slides: slides.map((slide) => ({
           id: slide.id,
           reference: slide.reference,
