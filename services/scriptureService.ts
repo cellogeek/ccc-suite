@@ -180,7 +180,8 @@ class ScriptureService {
       if (currentSlideVerses.length === 1 && slides.length > 0) {
         // Redistribute to avoid orphan - add to previous slide
         const lastSlide = slides[slides.length - 1];
-        lastSlide.content += '\n\n' + currentSlideVerses[0];
+        // *** CHANGE #2: Changed lastSlide.content to lastSlide.text ***
+        lastSlide.text += '\n\n' + currentSlideVerses[0];
       } else {
         slides.push(this.createSlide(currentSlideVerses, reference, fontSize, slides.length + 1));
       }
@@ -197,12 +198,14 @@ class ScriptureService {
 
   // Create individual slide
   private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
-    const content = verses.join('\n\n');
+    const textContent = verses.join('\n\n');
     
+    // *** CHANGE #1: Updated this return object to match the shared Slide type ***
     return {
       id: `slide-${slideNumber}`,
-      content,
-      reference: `${reference} (${slideNumber})`,
+      title: `${reference} (${slideNumber})`,
+      text: textContent,
+      verses: reference, // Added the missing 'verses' property
       fontSize,
       backgroundColor: '#000000',
       textColor: '#ffffff',
@@ -233,7 +236,8 @@ class ScriptureService {
     
     // Check verse count per slide (estimate from content)
     slides.forEach((slide, index) => {
-      const verseCount = (slide.content.match(/\n\n/g) || []).length + 1;
+      // Using 'text' property now
+      const verseCount = (slide.text.match(/\n\n/g) || []).length + 1;
       if (verseCount > 4) {
         issues.push({
           type: 'verse_count',
@@ -283,7 +287,8 @@ class ScriptureService {
     rtfContent += `\\f0\\fs48 ${reference}\\par\\par`;
     
     slides.forEach((slide, index) => {
-      rtfContent += `\\page\\f0\\fs${slide.fontSize * 2} ${slide.content.replace(/\n/g, '\\par ')}\\par`;
+      // Using 'text' property now
+      rtfContent += `\\page\\f0\\fs${slide.fontSize * 2} ${slide.text.replace(/\n/g, '\\par ')}\\par`;
     });
     
     rtfContent += '}';
@@ -297,7 +302,8 @@ class ScriptureService {
     
     slides.forEach((slide, index) => {
       txtContent += `--- Slide ${index + 1} ---\n`;
-      txtContent += `${slide.content}\n\n`;
+      // Using 'text' property now
+      txtContent += `${slide.text}\n\n`;
     });
     
     return new Blob([txtContent], { type: 'text/plain' });
@@ -310,8 +316,9 @@ class ScriptureService {
         title: reference,
         slides: slides.map((slide, index) => ({
           id: slide.id,
-          reference: slide.reference,
-          content: slide.content,
+          title: slide.title, // Use title property
+          text: slide.text, // Use text property
+          verses: slide.verses, // Use verses property
           fontSize: slide.fontSize,
           backgroundColor: slide.backgroundColor,
           textColor: slide.textColor,
