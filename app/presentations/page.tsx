@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Presentation, Plus, Search, Book, Music, Eye, Download, Edit, Trash2 } from "lucide-react";
-import AuthButton from "../../components/AuthButton";
-import { supabaseService } from "../../services/supabaseService";
-import { chordProService } from "../../services/chordProService";
-import { scriptureService } from "../../services/scriptureService";
-import { ChordProSong } from "../../types/chordpro";
-import { Slide } from "../../types/scripture";
+import AuthButton from "@/components/AuthButton"; // Corrected path
+import { supabaseService } from "@/services/supabaseService"; // Corrected path
+import { chordProService } from "@/services/chordProService"; // Corrected path
+import { scriptureService } from "@/services/scriptureService"; // Corrected path
+import { ChordProSong } from "@/types/chordpro"; // Corrected path
+import { Slide } from "@/types/scripture"; // Corrected path
 
 interface CombinedPresentation {
   id?: string;
