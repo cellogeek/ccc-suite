@@ -48,7 +48,7 @@ export default function LibraryPage() {
       const userPresentations = await supabaseService.getUserPresentations(session.user.id);
 // Filter out any presentations that don't have an ID
 const validPresentations = userPresentations.filter(p => p.id);
-setPresentations(validPresentations);
+setPresentations(validPresentations as PresentationData[]);
     } catch (error) {
       console.error('Error loading presentations:', error);
     } finally {
