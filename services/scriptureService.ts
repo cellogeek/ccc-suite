@@ -179,17 +179,23 @@ class ScriptureService {
   }
 
  // Create individual slide
-  private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
-    const content = verses.join('\n\n');
-
-    // Logic to create the 'verses' string (e.g., "16-18" or "16")
-    const verseNumbers = verses.map(v => v.match(/^\d+/)?.[0]).filter(Boolean) as string[];
-    let versesString = '';
-    if (verseNumbers.length > 1) {
-        versesString = `${verseNumbers[0]}-${verseNumbers[verseNumbers.length - 1]}`;
-    } else if (verseNumbers.length === 1) {
-        versesString = verseNumbers[0];
-    }
+private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
+  const content = verses.join('\n\n');
+  
+  return {
+    id: `slide-${slideNumber}`,
+    content,
+    reference: `${reference} (${slideNumber})`,
+    fontSize,
+    backgroundColor: '#000000',
+    textColor: '#ffffff',
+    fontFamily: 'Georgia, serif',
+    textAlign: 'center' as const,
+    verticalAlign: 'middle' as const,
+    padding: 40,
+    lineHeight: 1.4
+  };
+}
     
   return {
   id: `slide-${slideNumber}`,
