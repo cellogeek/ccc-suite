@@ -178,15 +178,24 @@ class ScriptureService {
     return remainingVerses === 1;
   }
 
-  // Create individual slide
+ // Create individual slide
   private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
     const content = verses.join('\n\n');
+
+    // Logic to create the 'verses' string (e.g., "16-18" or "16")
+    const verseNumbers = verses.map(v => v.match(/^\d+/)?.[0]).filter(Boolean) as string[];
+    let versesString = '';
+    if (verseNumbers.length > 1) {
+        versesString = `${verseNumbers[0]}-${verseNumbers[verseNumbers.length - 1]}`;
+    } else if (verseNumbers.length === 1) {
+        versesString = verseNumbers[0];
+    }
     
-    // *** FIX: This return object now correctly matches the Slide type definition ***
     return {
       id: `slide-${slideNumber}`,
       content: content,
       reference: `${reference} (${slideNumber})`,
+      verses: versesString, // The final, missing piece
       fontSize,
       backgroundColor: '#000000',
       textColor: '#ffffff',
@@ -197,7 +206,6 @@ class ScriptureService {
       lineHeight: 1.4
     };
   }
-
   // Generate compliance report
   private generateComplianceReport(slides: Slide[], totalVerses: number): ComplianceReport {
     const issues: any[] = [];
