@@ -48,13 +48,15 @@ export default function ExportPage() {
 const toggleSelection = (id?: string) => {
   setPresentations(prev =>
     prev.map(p => p.id === id ? { ...p, selected: !p.selected } : p)
+  );
+};
 
-  const selectAll = () => {
-    const allSelected = presentations.every(p => p.selected);
-    setPresentations(prev =>
-      prev.map(p => ({ ...p, selected: !allSelected }))
-    );
-  };
+const selectAll = () => {
+  const allSelected = presentations.every(p => p.selected);
+  setPresentations(prev =>
+    prev.map(p => ({ ...p, selected: !allSelected }))
+  );
+};
 
   const getSelectedPresentations = () => {
     return presentations.filter(p => p.selected);
