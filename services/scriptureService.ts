@@ -191,21 +191,19 @@ class ScriptureService {
         versesString = verseNumbers[0];
     }
     
-    return {
-      id: `slide-${slideNumber}`,
-      content: content,
-      reference: `${reference} (${slideNumber})`,
-      verses: versesString, // The final, missing piece
-      fontSize,
-      backgroundColor: '#000000',
-      textColor: '#ffffff',
-      fontFamily: 'Georgia, serif',
-      textAlign: 'center',
-      verticalAlign: 'middle',
-      padding: 40,
-      lineHeight: 1.4
-    };
-  }
+  return {
+  id: `slide-${slideNumber}`,
+  content: content,
+  reference: `${reference} (${slideNumber})`,
+  fontSize,
+  backgroundColor: '#000000',
+  textColor: '#ffffff',
+  fontFamily: 'Georgia, serif',
+  textAlign: 'center',
+  verticalAlign: 'middle',
+  padding: 40,
+  lineHeight: 1.4
+};
   // Generate compliance report
   private generateComplianceReport(slides: Slide[], totalVerses: number): ComplianceReport {
     const issues: any[] = [];
