@@ -7,12 +7,17 @@ export interface ScriptureReference {
 }
 
 export interface Slide {
-  id: number;
-  title: string;
+  id: string;
   content: string;
-  verses: string[];
+  reference: string;
   fontSize: number;
-  verseCount: number;
+  backgroundColor: string;
+  textColor: string;
+  fontFamily: string;
+  textAlign: 'left' | 'center' | 'right';
+  verticalAlign: 'top' | 'middle' | 'bottom';
+  padding: number;
+  lineHeight: number;
 }
 
 export interface ComplianceReport {
