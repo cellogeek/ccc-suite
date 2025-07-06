@@ -1,18 +1,10 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import AuthSessionProvider from "../components/SessionProvider";
-import Navigation from "../components/Navigation";
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+import { Providers } from './providers'
+import Navigation from '../components/Navigation'
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: "CCC Suite - Canyon Country Freewill Baptist Church",
@@ -25,21 +17,25 @@ export const metadata: Metadata = {
   },
 };
 
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+import { Providers } from './providers'
+import Navigation from '../components/Navigation'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'CCC Suite - Church Media Tools',
+  description: 'Professional church media tools for scripture slides and presentations',
+}
+
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <AuthSessionProvider>
-          <Navigation />
-          {children}
-        </AuthSessionProvider>
-      </body>
-    </html>
-  );
-}
+
+Html
+) }
