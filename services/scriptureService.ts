@@ -204,6 +204,8 @@ class ScriptureService {
   padding: 40,
   lineHeight: 1.4
 };
+}
+
   // Generate compliance report
   private generateComplianceReport(slides: Slide[], totalVerses: number): ComplianceReport {
     const issues: any[] = [];
