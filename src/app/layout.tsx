@@ -17,6 +17,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-
-Html
-) }
+    <html lang="en">
+      <body className={inter.className}>
+        <Providers>
+          <Navigation />
+          {children}
+        </Providers>
+      </body>
+    </html>
+  )
+}
