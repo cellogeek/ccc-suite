@@ -7,12 +7,12 @@ import AuthButton from "../../components/AuthButton";
 import { supabaseService } from "../../services/supabaseService";
 
 interface ExportablePresentation {
-  id: string;
+  id?: string;  // Changed from 'string' to '?string'
   title: string;
   scriptureReference: string;
   slides: any[];
   selected: boolean;
-  createdAt: string;
+  createdAt: Date | string;
 }
 
 export default function ExportPage() {
@@ -45,11 +45,9 @@ export default function ExportPage() {
     }
   };
 
-  const toggleSelection = (id: string) => {
-    setPresentations(prev =>
-      prev.map(p => p.id === id ? { ...p, selected: !p.selected } : p)
-    );
-  };
+const toggleSelection = (id?: string) => {
+  setPresentations(prev =>
+    prev.map(p => p.id === id ? { ...p, selected: !p.selected } : p)
 
   const selectAll = () => {
     const allSelected = presentations.every(p => p.selected);
