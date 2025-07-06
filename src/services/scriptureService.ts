@@ -216,18 +216,23 @@ class ScriptureService {
   }
 
   // Create individual slide
-  private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
-    const content = verses.join('\n\n');
-    const title = `${reference} (${slideNumber})`;
-    
-    return {
-      id: `slide-${slideNumber}`,
-      title,
-      content,
-      fontSize,
-      verseCount: verses.length
-    };
-  }
+private createSlide(verses: string[], reference: string, fontSize: number, slideNumber: number): Slide {
+  const content = verses.join('\n\n');
+  
+  return {
+    id: `slide-${slideNumber}`,
+    content,
+    reference: `${reference} (${slideNumber})`,
+    fontSize,
+    backgroundColor: '#000000',
+    textColor: '#ffffff',
+    fontFamily: 'Georgia, serif',
+    textAlign: 'center' as const,
+    verticalAlign: 'middle' as const,
+    padding: 40,
+    lineHeight: 1.4
+  };
+}
 
   // Generate compliance report
   private generateComplianceReport(slides: Slide[], totalVerses: number): ComplianceReport {
